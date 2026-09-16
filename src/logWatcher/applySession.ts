@@ -11,6 +11,14 @@ export interface ApplySessionResult {
 
 const LAST_RAID_SEEN_KEY = "lastRaidSeenAt";
 
+function readSafely(path: string): string {
+  try {
+    return readFileSync(path, "utf-8");
+  } catch {
+    return "";
+  }
+}
+
 export function applySessionToStore(sessionDir: string, store: ProgressStore): ApplySessionResult {
   let taskEventsApplied = 0;
   let raidEventsSeen = 0;
@@ -18,7 +26,7 @@ export function applySessionToStore(sessionDir: string, store: ProgressStore): A
 
   const notificationsPath = findLogFile(sessionDir, "pushNotifications");
   if (notificationsPath) {
-    const text = readFileSync(notificationsPath, "utf-8");
+    const text = readSafely(notificationsPath);
     for (const event of extractNotificationEvents(text)) {
       if (event.kind === "task") {
         store.recordEvent(event.taskId, event.status, event.occurredAt);
@@ -34,7 +42,7 @@ export function applySessionToStore(sessionDir: string, store: ProgressStore): A
 
   const applicationPath = findLogFile(sessionDir, "application");
   if (applicationPath) {
-    const text = readFileSync(applicationPath, "utf-8");
+    const text = readSafely(applicationPath);
     for (const event of extractRaidStartEvents(text)) {
       raidEventsSeen++;
       if (!latestRaidTimestamp || event.occurredAt > latestRaidTimestamp) {

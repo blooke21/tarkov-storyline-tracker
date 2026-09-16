@@ -49,6 +49,19 @@ describe("parseLogLine", () => {
     });
   });
 
+  it("parses a real current-format line that also carries a timezone offset (seen on this machine in Nov 2025 builds)", () => {
+    const line = "2025-11-15 11:47:42.290 -06:00|1.0.0.0.41760|Info|application|Application awaken, updateQueue:'Update'";
+
+    expect(parseLogLine(line)).toEqual({
+      date: "2025-11-15",
+      time: "11:47:42.290",
+      version: "1.0.0.0.41760",
+      level: "Info",
+      logType: "application",
+      message: "Application awaken, updateQueue:'Update'",
+    });
+  });
+
   it("returns null for a line matching neither format", () => {
     expect(parseLogLine("this is not a log line at all")).toBeNull();
   });

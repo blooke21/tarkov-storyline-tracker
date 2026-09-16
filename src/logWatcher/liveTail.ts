@@ -40,7 +40,13 @@ export class LogTailer {
     if (!session) {
       return;
     }
-    applySessionToStore(session.path, this.store);
+    try {
+      applySessionToStore(session.path, this.store);
+    } catch {
+      // A transient read failure (file deleted/locked mid-poll) should
+      // not crash the process — just try again on the next tick.
+      return;
+    }
     this.store.setMeta("lastWatcherPollAt", new Date().toISOString());
   }
 }

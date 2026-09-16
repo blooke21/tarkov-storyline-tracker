@@ -57,4 +57,10 @@ describe("extractRaidStartEvents", () => {
   it("returns an empty array for text with no raid lines", () => {
     expect(extractRaidStartEvents("nothing relevant here")).toEqual([]);
   });
+
+  it("ignores a GameStarted line with no preceding profileStatus at all in the file", () => {
+    const text = "2026-05-31 19:15:31.816|1.0.5.0.45272|Info|application|GameStarted:1(0) real:1(0) diff:0";
+
+    expect(extractRaidStartEvents(text)).toEqual([]);
+  });
 });

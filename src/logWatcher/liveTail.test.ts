@@ -93,6 +93,29 @@ describe("LogTailer.poll", () => {
     expect(stamped).not.toBeNull();
     expect(Number.isNaN(new Date(stamped!).getTime())).toBe(false);
   });
+
+  it("stamps lastWatcherPollAt even when a log file in the session is unreadable (handled gracefully by readSafely)", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-livetail-test-"));
+    const sessionDir = join(tempDir, "log_2026.09.16_13-19-26_1.1.5.0.47426");
+    mkdirSync(sessionDir, { recursive: true });
+    mkdirSync(join(sessionDir, "prefix push-notifications_000.log")); // a directory, not a file
+    store = new ProgressStore(":memory:");
+    tailer = new LogTailer(tempDir, store);
+
+    expect(() => tailer!.poll()).not.toThrow();
+    expect(store.getMeta("lastWatcherPollAt")).not.toBeNull();
+  });
+
+  it("does not throw and does not stamp lastWatcherPollAt when the store itself throws (e.g. already closed)", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-livetail-test-"));
+    writeSessionWithTask(tempDir, "log_2026.09.16_13-19-26_1.1.5.0.47426", "aaaaaaaaaaaaaaaaaaaaaaaa");
+    store = new ProgressStore(":memory:");
+    store.close(); // force any subsequent store call to throw
+    tailer = new LogTailer(tempDir, store);
+
+    expect(() => tailer!.poll()).not.toThrow();
+    expect(() => store!.getMeta("lastWatcherPollAt")).toThrow(); // store is closed, can't even check via getMeta
+  });
 });
 
 describe("LogTailer.start / stop", () => {

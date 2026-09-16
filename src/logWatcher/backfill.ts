@@ -14,9 +14,15 @@ export function runBackfill(logsRootDir: string, store: ProgressStore): Backfill
   let raidEventsSeen = 0;
 
   for (const session of sessions) {
-    const result = applySessionToStore(session.path, store);
-    taskEventsApplied += result.taskEventsApplied;
-    raidEventsSeen += result.raidEventsSeen;
+    try {
+      const result = applySessionToStore(session.path, store);
+      taskEventsApplied += result.taskEventsApplied;
+      raidEventsSeen += result.raidEventsSeen;
+    } catch {
+      // One unreadable/corrupt session should not abort backfill for
+      // every session after it.
+      continue;
+    }
   }
 
   return { sessionsProcessed: sessions.length, taskEventsApplied, raidEventsSeen };

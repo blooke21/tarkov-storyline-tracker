@@ -57,4 +57,27 @@ describe("runBackfill", () => {
     store = new ProgressStore(":memory:");
     expect(() => runBackfill(join(tmpdir(), "does-not-exist-" + Date.now()), store!)).not.toThrow();
   });
+
+  it("continues processing later sessions when an earlier one is unreadable", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-backfill-test-"));
+    const badSessionDir = join(tempDir, "log_2025.01.01_10-00-00_1.0.0.0.1");
+    mkdirSync(badSessionDir, { recursive: true });
+    mkdirSync(join(badSessionDir, "prefix push-notifications_000.log")); // a directory, not a file
+    writeSession(tempDir, "log_2026.01.01_10-00-00_1.0.0.0.2", "bbbbbbbbbbbbbbbbbbbbbbbb", 1750000000);
+    store = new ProgressStore(":memory:");
+
+    const result = runBackfill(tempDir, store);
+
+    expect(result.sessionsProcessed).toBe(2);
+    expect(store.getStatus("bbbbbbbbbbbbbbbbbbbbbbbb")).toBe("accepted");
+  });
+
+  it("does not throw when the store itself throws for every session (e.g. already closed)", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-backfill-test-"));
+    writeSession(tempDir, "log_2025.01.01_10-00-00_1.0.0.0.1", "aaaaaaaaaaaaaaaaaaaaaaaa", 1700000000);
+    store = new ProgressStore(":memory:");
+    store.close(); // force any subsequent store call to throw
+
+    expect(() => runBackfill(tempDir!, store!)).not.toThrow();
+  });
 });

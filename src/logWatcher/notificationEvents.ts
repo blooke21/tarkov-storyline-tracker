@@ -78,13 +78,13 @@ function readJsonBlock(lines: string[], startIndex: number): { json: any; nextIn
         if (char === "}") braceCount--;
       }
     }
-    if (braceCount === 0 && i >= startIndex) {
+    if (braceCount === 0) {
       endIndex = i;
       break;
     }
   }
   if (endIndex === -1) {
-    return { json: null, nextIndex: lines.length - 1 };
+    return { json: null, nextIndex: startIndex };
   }
 
   const blockText = lines.slice(startIndex, endIndex + 1).join("\n");

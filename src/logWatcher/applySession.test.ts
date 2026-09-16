@@ -141,4 +141,18 @@ describe("applySessionToStore", () => {
 
     expect(result).toEqual({ taskEventsApplied: 0, raidEventsSeen: 0 });
   });
+
+  it("does not throw when a log file path turns out to be unreadable (e.g. a directory)", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-apply-session-test-"));
+    const sessionDir = join(tempDir, "log_2026.09.16_13-19-26_1.1.5.0.47426");
+    mkdirSync(sessionDir, { recursive: true });
+    const prefix = "2026.09.16_13-19-26_1.1.5.0.47426";
+    // Create the expected filename AS A DIRECTORY, not a file, so
+    // readFileSync fails with EISDIR when applySessionToStore tries to
+    // read it.
+    mkdirSync(join(sessionDir, `${prefix} push-notifications_000.log`));
+    store = new ProgressStore(":memory:");
+
+    expect(() => applySessionToStore(sessionDir, store!)).not.toThrow();
+  });
 });

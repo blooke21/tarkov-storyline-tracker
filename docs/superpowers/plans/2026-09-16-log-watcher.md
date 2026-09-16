@@ -37,6 +37,12 @@ inferred from someone else's source code. Specifically confirmed:
   without the version field, documented only in TarkovMonitor's issue
   history and never observed on this machine, is kept as a defensive
   fallback in the tokenizer — see Task 2.)
+  **Correction (post-launch fix wave):** a third variant — the current
+  format's fields WITH a timezone offset also present after the time —
+  was later found on this machine (1,841 real lines, Nov 2025 builds
+  `1.0.0.0.41760`/`.41771`). It is not the older version-less format
+  described above; it is now handled by making the offset optional in
+  `CURRENT_FORMAT` rather than being "never observed."
 - Real quest-accepted (`type: 10`), quest-failed (`type: 11`), and
   quest-completed (`type: 12`) notification payloads, pulled directly
   from this user's own log history (task/item template IDs kept as-is
@@ -346,6 +352,15 @@ defensive fallback rather than assuming the current format is permanent.
 If a line matches neither format, `parseLogLine` returns `null` — per
 the Global Constraints, callers must treat that as "skip this line," not
 an error.
+
+**Correction (post-launch fix wave):** "every real log line... uses
+[the no-offset format]" above is now known false — 1,841 real lines on
+this machine (Nov 2025 builds `1.0.0.0.41760`/`.41771`) combine the
+current format's version field WITH a timezone offset after the time,
+a variant this design note didn't anticipate. It was previously
+mis-parsed by falling through to the version-less legacy branch below.
+Fixed by making the offset optional in `CURRENT_FORMAT` so it's tried
+first and matches correctly, rather than adding a third regex.
 
 - [ ] **Step 1: Write the failing test**
 
