@@ -71,6 +71,66 @@ describe("applySessionToStore", () => {
     expect(store.getMeta("lastRaidSeenAt")).toBe(new Date(2027, 0, 1).toISOString());
   });
 
+  it("rejects an older raid event when a newer lastRaidSeenAt is already stored", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-apply-session-test-"));
+    const sessionDir = join(tempDir, "log_2026.09.16_13-19-26_1.1.5.0.47426");
+    // A real raid-ended (UserMatchOver) notification dated 2025-11-22 — well
+    // before the newer lastRaidSeenAt seeded below.
+    const notifications = [
+      "2025-11-22 15:44:56.154|1.0.0.1.41923|Info|push-notifications|Got notification | UserMatchOver",
+      "{",
+      '  "type": "userMatchOver",',
+      '  "eventId": "69222ed80324ce18df0f0131",',
+      '  "profileid": "profile-placeholder",',
+      '  "status": "Free",',
+      '  "location": "TarkovStreets",',
+      '  "raidMode": "Online",',
+      '  "mode": "deathmatch",',
+      '  "shortId": null',
+      "}",
+    ].join("\n");
+    writeSession(sessionDir, notifications, "");
+    store = new ProgressStore(":memory:");
+    const newerTimestamp = new Date(2027, 0, 1).toISOString();
+    store.setMeta("lastRaidSeenAt", newerTimestamp);
+
+    const result = applySessionToStore(sessionDir, store);
+
+    expect(result.raidEventsSeen).toBe(1);
+    expect(store.getMeta("lastRaidSeenAt")).toBe(newerTimestamp);
+  });
+
+  it("takes the max timestamp across both log files when both contain raid events", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-apply-session-test-"));
+    const sessionDir = join(tempDir, "log_2026.09.16_13-19-26_1.1.5.0.47426");
+    // Older raid-ended notification (2025-11-22) alongside a newer raid-start
+    // sequence in the application log (2026-05-31) in the same session.
+    const notifications = [
+      "2025-11-22 15:44:56.154|1.0.0.1.41923|Info|push-notifications|Got notification | UserMatchOver",
+      "{",
+      '  "type": "userMatchOver",',
+      '  "eventId": "69222ed80324ce18df0f0131",',
+      '  "profileid": "profile-placeholder",',
+      '  "status": "Free",',
+      '  "location": "TarkovStreets",',
+      '  "raidMode": "Online",',
+      '  "mode": "deathmatch",',
+      '  "shortId": null',
+      "}",
+    ].join("\n");
+    const application = [
+      "2026-05-31 19:14:50.104|1.0.5.0.45272|Debug|application|TRACE-NetworkGameCreate profileStatus: 'Location: TarkovStreets, RaidMode: Online, shortId: FW3C55'",
+      "2026-05-31 19:15:31.816|1.0.5.0.45272|Info|application|GameStarted:1(0) real:1(0) diff:0",
+    ].join("\n");
+    writeSession(sessionDir, notifications, application);
+    store = new ProgressStore(":memory:");
+
+    const result = applySessionToStore(sessionDir, store);
+
+    expect(result.raidEventsSeen).toBe(2);
+    expect(store.getMeta("lastRaidSeenAt")).toBe(new Date(2026, 4, 31, 19, 15, 31, 816).toISOString());
+  });
+
   it("handles a session directory with no matching log files without throwing", () => {
     tempDir = mkdtempSync(join(tmpdir(), "tarkov-apply-session-test-"));
     const sessionDir = join(tempDir, "empty-session");
