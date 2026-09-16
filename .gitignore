@@ -1,0 +1,5 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.tarkov-cache.json
+*.sqlite
