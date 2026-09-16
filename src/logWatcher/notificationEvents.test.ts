@@ -174,6 +174,38 @@ describe("extractNotificationEvents", () => {
     ]);
   });
 
+  it("extracts task event with brace characters inside string values without dropping the event", () => {
+    const text = [
+      "2026-01-15 10:30:45.123|1.0.4.1.44236|Info|push-notifications|Got notification | ChatMessageReceived",
+      "{",
+      '  "type": "new_message",',
+      '  "eventId": "69d4a2f1c8e9b5a3d7f2e1c0",',
+      '  "dialogId": "dialog-placeholder",',
+      '  "message": {',
+      '    "_id": "69d4a2f1c8e9b5a3d7f2e1c1",',
+      '    "uid": "dialog-placeholder",',
+      '    "type": 10,',
+      '    "dt": 1747689045,',
+      '    "text": "Bring the item to the stash }",',
+      '    "templateId": "57ffe4461d7cb07d13629916 description",',
+      '    "hasRewards": false,',
+      '    "maxStorageTime": 604800',
+      "  }",
+      "}",
+    ].join("\n");
+
+    const events = extractNotificationEvents(text);
+
+    expect(events).toEqual([
+      {
+        kind: "task",
+        taskId: "57ffe4461d7cb07d13629916",
+        status: "accepted",
+        occurredAt: new Date(1747689045 * 1000),
+      },
+    ]);
+  });
+
   it("returns an empty array for text with no notification lines", () => {
     expect(extractNotificationEvents("just some unrelated log content\nnothing to see here")).toEqual([]);
   });

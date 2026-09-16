@@ -58,9 +58,25 @@ function readJsonBlock(lines: string[], startIndex: number): { json: any; nextIn
   let endIndex = -1;
   for (let i = startIndex; i < lines.length; i++) {
     const trimmed = lines[i].trim();
+    let inString = false;
+    let escapeNext = false;
     for (const char of trimmed) {
-      if (char === "{") braceCount++;
-      if (char === "}") braceCount--;
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+      if (char === "\\") {
+        escapeNext = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (char === "{") braceCount++;
+        if (char === "}") braceCount--;
+      }
     }
     if (braceCount === 0 && i >= startIndex) {
       endIndex = i;
