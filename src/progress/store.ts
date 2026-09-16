@@ -7,6 +7,10 @@ interface ProgressRow {
   status: TaskStatus;
 }
 
+interface MetaRow {
+  value: string;
+}
+
 export class ProgressStore {
   private db: Database.Database;
 
@@ -17,6 +21,12 @@ export class ProgressStore {
         task_id TEXT PRIMARY KEY,
         status TEXT NOT NULL CHECK(status IN ('accepted', 'completed', 'failed')),
         updated_at TEXT NOT NULL
+      )
+    `);
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS store_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
       )
     `);
   }
@@ -44,6 +54,20 @@ export class ProgressStore {
   getAllStatuses(): Map<string, TaskStatus> {
     const rows = this.db.prepare(`SELECT task_id, status FROM task_progress`).all() as ProgressRow[];
     return new Map(rows.map((row) => [row.task_id, row.status]));
+  }
+
+  setMeta(key: string, value: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO store_meta (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+      )
+      .run(key, value);
+  }
+
+  getMeta(key: string): string | null {
+    const row = this.db.prepare(`SELECT value FROM store_meta WHERE key = ?`).get(key) as MetaRow | undefined;
+    return row ? row.value : null;
   }
 
   close(): void {

@@ -44,3 +44,23 @@ describe("ProgressStore", () => {
     expect(all.size).toBe(2);
   });
 });
+
+describe("ProgressStore metadata", () => {
+  it("returns null for a key that has never been set", () => {
+    store = new ProgressStore(":memory:");
+    expect(store.getMeta("lastRaidSeenAt")).toBeNull();
+  });
+
+  it("sets and retrieves a metadata value", () => {
+    store = new ProgressStore(":memory:");
+    store.setMeta("lastRaidSeenAt", "2026-09-16T13:20:11.174Z");
+    expect(store.getMeta("lastRaidSeenAt")).toBe("2026-09-16T13:20:11.174Z");
+  });
+
+  it("overwrites an existing metadata value", () => {
+    store = new ProgressStore(":memory:");
+    store.setMeta("lastRaidSeenAt", "2026-09-16T13:20:11.174Z");
+    store.setMeta("lastRaidSeenAt", "2026-09-17T09:00:00.000Z");
+    expect(store.getMeta("lastRaidSeenAt")).toBe("2026-09-17T09:00:00.000Z");
+  });
+});
