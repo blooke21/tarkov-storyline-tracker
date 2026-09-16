@@ -15,7 +15,7 @@ export class ProgressStore {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS task_progress (
         task_id TEXT PRIMARY KEY,
-        status TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('accepted', 'completed', 'failed')),
         updated_at TEXT NOT NULL
       )
     `);
@@ -26,7 +26,10 @@ export class ProgressStore {
       .prepare(
         `INSERT INTO task_progress (task_id, status, updated_at)
          VALUES (?, ?, ?)
-         ON CONFLICT(task_id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`
+         ON CONFLICT(task_id) DO UPDATE SET
+           status = excluded.status,
+           updated_at = excluded.updated_at
+         WHERE excluded.updated_at >= task_progress.updated_at`
       )
       .run(taskId, status, occurredAt.toISOString());
   }

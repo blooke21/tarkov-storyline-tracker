@@ -13,6 +13,7 @@ const TASKS_QUERY = `
       factionName
       minPlayerLevel
       trader { id name }
+      map { id name }
       objectives { id type description optional }
       taskRequirements { status task { id } }
     }
@@ -43,6 +44,10 @@ export async function fetchTasks(fetchImpl: typeof fetch = fetch): Promise<Tarko
 
   if (!body.data) {
     throw new Error("tarkov.dev API returned no data");
+  }
+
+  if (!Array.isArray(body.data.tasks)) {
+    throw new Error("tarkov.dev API response did not include a tasks array");
   }
 
   return body.data.tasks;

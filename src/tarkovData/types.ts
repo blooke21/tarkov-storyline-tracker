@@ -3,6 +3,11 @@ export interface TarkovTrader {
   name: string;
 }
 
+export interface TarkovMap {
+  id: string;
+  name: string;
+}
+
 export interface TaskObjective {
   id: string | null;
   type: string;
@@ -19,6 +24,7 @@ export interface TarkovTask {
   id: string;
   name: string;
   trader: TarkovTrader;
+  map: TarkovMap | null;
   wikiLink: string | null;
   kappaRequired: boolean;
   lightkeeperRequired: boolean;

@@ -6,6 +6,7 @@ const sampleTask: TarkovTask = {
   id: "1",
   name: "Debut",
   trader: { id: "t1", name: "Prapor" },
+  map: null,
   wikiLink: "https://escapefromtarkov.fandom.com/wiki/Debut",
   kappaRequired: false,
   lightkeeperRequired: false,
@@ -62,6 +63,17 @@ describe("fetchTasks", () => {
 
     await expect(fetchTasks(fakeFetch as unknown as typeof fetch)).rejects.toThrow(
       "tarkov.dev API returned no data"
+    );
+  });
+
+  it("throws when the response's data field has no tasks array", async () => {
+    const fakeFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: {} }),
+    });
+
+    await expect(fetchTasks(fakeFetch as unknown as typeof fetch)).rejects.toThrow(
+      "tarkov.dev API response did not include a tasks array"
     );
   });
 });

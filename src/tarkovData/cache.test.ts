@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { saveCache, loadCache, isStale } from "./cache.js";
+import { saveCache, loadCache, isStale, CACHE_VERSION } from "./cache.js";
 import type { TarkovTask } from "./types.js";
 
 const sampleTasks: TarkovTask[] = [
@@ -10,10 +10,11 @@ const sampleTasks: TarkovTask[] = [
     id: "1",
     name: "Debut",
     trader: { id: "t1", name: "Prapor" },
+    map: null,
     wikiLink: "https://escapefromtarkov.fandom.com/wiki/Debut",
     kappaRequired: false,
     lightkeeperRequired: false,
-    factionName: null,
+    factionName: "Any",
     minPlayerLevel: 1,
     objectives: [],
     taskRequirements: [],
@@ -30,7 +31,7 @@ afterEach(() => {
 });
 
 describe("saveCache / loadCache", () => {
-  it("round-trips tasks and a fetchedAt timestamp", () => {
+  it("round-trips tasks, a fetchedAt timestamp, and the cache version", () => {
     tempDir = mkdtempSync(join(tmpdir(), "tarkov-cache-test-"));
     const cachePath = join(tempDir, "cache.json");
     const now = new Date("2026-01-01T00:00:00.000Z");
@@ -41,6 +42,7 @@ describe("saveCache / loadCache", () => {
     expect(loaded).not.toBeNull();
     expect(loaded?.tasks).toEqual(sampleTasks);
     expect(loaded?.fetchedAt).toBe(now.toISOString());
+    expect(loaded?.version).toBe(CACHE_VERSION);
   });
 
   it("returns null when the cache file does not exist", () => {
@@ -48,6 +50,35 @@ describe("saveCache / loadCache", () => {
     const cachePath = join(tempDir, "missing.json");
 
     expect(loadCache(cachePath)).toBeNull();
+  });
+
+  it("returns null instead of throwing when the cache file is corrupt", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-cache-test-"));
+    const cachePath = join(tempDir, "corrupt.json");
+    writeFileSync(cachePath, "{ this is not valid json", "utf-8");
+
+    expect(loadCache(cachePath)).toBeNull();
+  });
+
+  it("returns null when the cache file has an incompatible version", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-cache-test-"));
+    const cachePath = join(tempDir, "old-version.json");
+    writeFileSync(
+      cachePath,
+      JSON.stringify({ version: 0, fetchedAt: new Date().toISOString(), tasks: sampleTasks }),
+      "utf-8"
+    );
+
+    expect(loadCache(cachePath)).toBeNull();
+  });
+
+  it("does not leave a temp file behind after a successful save", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-cache-test-"));
+    const cachePath = join(tempDir, "cache.json");
+
+    saveCache(cachePath, sampleTasks);
+
+    expect(existsSync(`${cachePath}.tmp`)).toBe(false);
   });
 });
 
