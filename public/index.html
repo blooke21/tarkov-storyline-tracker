@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Tarkov Storyline Tracker</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Tarkov Storyline Tracker</h1>
+    <p id="status-line" class="status-line">Loading...</p>
+  </header>
+
+  <main>
+    <section id="overall-progress" class="storyline-card overall" aria-label="Overall progress"></section>
+
+    <section id="storylines" aria-label="Storyline progress"></section>
+
+    <section aria-label="Filters" class="filters">
+      <label>
+        Storyline
+        <select id="filter-storyline"><option value="">All</option></select>
+      </label>
+      <label>
+        Trader
+        <select id="filter-trader"><option value="">All</option></select>
+      </label>
+      <label>
+        Map
+        <select id="filter-map"><option value="">All</option></select>
+      </label>
+      <label>
+        <input type="checkbox" id="filter-actionable" />
+        Next up only
+      </label>
+    </section>
+
+    <section id="tasks" aria-label="Tasks"></section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
