@@ -75,6 +75,19 @@ describe("createServer", () => {
     expect([403, 404]).toContain(response.status);
   });
 
+  it("returns 400 for a malformed percent-encoded path instead of hanging or crashing", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
+    server = createServer({ apiRoutes: {}, staticDir: tempDir });
+    await new Promise<void>((resolve) => server!.listen(0, resolve));
+
+    // %e0%e0 is valid hex (so it passes the client's own URL parsing
+    // untouched) but is not valid UTF-8, so decodeURIComponent throws
+    // URIError: URI malformed when the server tries to decode it.
+    const response = await fetch(`${baseUrl()}/%e0%e0`);
+
+    expect(response.status).toBe(400);
+  });
+
   it("routes a GET request to a matching API handler and returns JSON", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
     server = createServer({

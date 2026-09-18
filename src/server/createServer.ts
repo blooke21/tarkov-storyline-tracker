@@ -45,7 +45,17 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, options:
 }
 
 async function serveStatic(staticDir: string, pathname: string, res: ServerResponse): Promise<void> {
-  const decodedPath = decodeURIComponent(pathname === "/" ? "/index.html" : pathname);
+  let decodedPath: string;
+  try {
+    decodedPath = decodeURIComponent(pathname === "/" ? "/index.html" : pathname);
+  } catch (error) {
+    if (error instanceof URIError) {
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      res.end("Bad request");
+      return;
+    }
+    throw error;
+  }
   const resolvedStaticDir = resolve(staticDir);
   const filePath = resolve(resolvedStaticDir, `.${decodedPath}`);
 
