@@ -3,24 +3,45 @@ const state = {
   storylines: [],
 };
 
+function escapeHtml(value) {
+  const div = document.createElement("div");
+  div.textContent = String(value ?? "");
+  return div.innerHTML;
+}
+
+function isSafeHttpUrl(value) {
+  try {
+    const url = new URL(value, window.location.origin);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 async function loadData() {
-  const [statusRes, progressRes, tasksRes] = await Promise.all([
-    fetch("/api/status"),
-    fetch("/api/progress"),
-    fetch("/api/tasks"),
-  ]);
-  const status = await statusRes.json();
-  const progress = await progressRes.json();
-  const tasksData = await tasksRes.json();
+  try {
+    const [statusRes, progressRes, tasksRes] = await Promise.all([
+      fetch("/api/status"),
+      fetch("/api/progress"),
+      fetch("/api/tasks"),
+    ]);
+    const status = await statusRes.json();
+    const progress = await progressRes.json();
+    const tasksData = await tasksRes.json();
 
-  state.storylines = progress.storylines;
-  state.tasks = tasksData.tasks;
+    state.storylines = progress.storylines;
+    state.tasks = tasksData.tasks;
 
-  renderStatus(status);
-  renderOverall(progress.overall);
-  renderStorylines(state.storylines);
-  populateFilters(state.tasks);
-  renderTasks();
+    renderStatus(status);
+    renderOverall(progress.overall);
+    renderStorylines(state.storylines);
+    populateFilters(state.tasks);
+    renderTasks();
+  } catch (error) {
+    console.error("Failed to load dashboard data:", error);
+    const line = document.getElementById("status-line");
+    line.textContent = "Could not reach the local server — retrying...";
+  }
 }
 
 function renderOverall(overall) {
@@ -55,7 +76,7 @@ function renderStorylines(storylines) {
     const card = document.createElement("div");
     card.className = "storyline-card";
     card.innerHTML = `
-      <h3>${storyline.name} — ${storyline.completedTasks}/${storyline.totalTasks} (${percent}%)</h3>
+      <h3>${escapeHtml(storyline.name)} — ${storyline.completedTasks}/${storyline.totalTasks} (${percent}%)</h3>
       <div class="progress-bar"><div style="width: ${percent}%"></div></div>
     `;
     container.appendChild(card);
@@ -122,20 +143,24 @@ function renderTasks() {
       badges.push('<span class="badge actionable">Next up</span>');
     }
     if (task.status) {
-      badges.push(`<span class="badge">${task.status}</span>`);
+      badges.push(`<span class="badge">${escapeHtml(task.status)}</span>`);
     }
     const objectives = task.objectives
-      .map((o) => `<li>${o.description}${o.optional ? " (optional)" : ""}</li>`)
+      .map((o) => `<li>${escapeHtml(o.description)}${o.optional ? " (optional)" : ""}</li>`)
       .join("");
-    const wiki = task.wikiLink
-      ? `<a href="${task.wikiLink}" target="_blank" rel="noopener">View on wiki</a>`
-      : "";
     card.innerHTML = `
-      <h4>${task.name}</h4>
-      <div class="task-meta">${badges.join(" ")} ${task.trader}${task.map ? " • " + task.map : ""}</div>
+      <h4>${escapeHtml(task.name)}</h4>
+      <div class="task-meta">${badges.join(" ")} ${escapeHtml(task.trader)}${task.map ? " • " + escapeHtml(task.map) : ""}</div>
       <ul>${objectives}</ul>
-      ${wiki}
     `;
+    if (task.wikiLink && isSafeHttpUrl(task.wikiLink)) {
+      const link = document.createElement("a");
+      link.href = task.wikiLink;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "View on wiki";
+      card.appendChild(link);
+    }
     container.appendChild(card);
   }
 }
@@ -145,3 +170,4 @@ for (const id of ["filter-storyline", "filter-trader", "filter-map", "filter-act
 }
 
 loadData();
+setInterval(loadData, 15000);

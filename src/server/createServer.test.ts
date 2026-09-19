@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
+import { connect } from "node:net";
 import type { Server } from "node:http";
 import { createServer } from "./createServer.js";
 
@@ -30,7 +31,7 @@ describe("createServer", () => {
     tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
     writeFileSync(join(tempDir, "index.html"), "<h1>Hello</h1>");
     server = createServer({ apiRoutes: {}, staticDir: tempDir });
-    await new Promise<void>((resolve) => server!.listen(0, resolve));
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
 
     const response = await fetch(`${baseUrl()}/`);
     const text = await response.text();
@@ -44,7 +45,7 @@ describe("createServer", () => {
     tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
     writeFileSync(join(tempDir, "styles.css"), "body { color: red; }");
     server = createServer({ apiRoutes: {}, staticDir: tempDir });
-    await new Promise<void>((resolve) => server!.listen(0, resolve));
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
 
     const response = await fetch(`${baseUrl()}/styles.css`);
 
@@ -55,7 +56,7 @@ describe("createServer", () => {
   it("returns 404 for a missing static file", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
     server = createServer({ apiRoutes: {}, staticDir: tempDir });
-    await new Promise<void>((resolve) => server!.listen(0, resolve));
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
 
     const response = await fetch(`${baseUrl()}/does-not-exist.html`);
 
@@ -65,7 +66,7 @@ describe("createServer", () => {
   it("blocks a percent-encoded path-traversal attempt outside the static directory", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
     server = createServer({ apiRoutes: {}, staticDir: tempDir });
-    await new Promise<void>((resolve) => server!.listen(0, resolve));
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
 
     // Percent-encoded so it survives to the server undecoded, the way a
     // crafted request (not a normal browser navigation, which a URL parser
@@ -78,7 +79,7 @@ describe("createServer", () => {
   it("returns 400 for a malformed percent-encoded path instead of hanging or crashing", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
     server = createServer({ apiRoutes: {}, staticDir: tempDir });
-    await new Promise<void>((resolve) => server!.listen(0, resolve));
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
 
     // %e0%e0 is valid hex (so it passes the client's own URL parsing
     // untouched) but is not valid UTF-8, so decodeURIComponent throws
@@ -94,7 +95,7 @@ describe("createServer", () => {
       apiRoutes: { "GET /api/hello": () => ({ message: "hi" }) },
       staticDir: tempDir,
     });
-    await new Promise<void>((resolve) => server!.listen(0, resolve));
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
 
     const response = await fetch(`${baseUrl()}/api/hello`);
     const body = await response.json();
@@ -115,7 +116,7 @@ describe("createServer", () => {
       },
       staticDir: tempDir,
     });
-    await new Promise<void>((resolve) => server!.listen(0, resolve));
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
 
     const response = await fetch(`${baseUrl()}/api/broken`);
     const body = (await response.json()) as { error: string };
@@ -134,10 +135,49 @@ describe("createServer", () => {
       },
       staticDir: tempDir,
     });
-    await new Promise<void>((resolve) => server!.listen(0, resolve));
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
 
     const response = await fetch(`${baseUrl()}/api/crash`);
 
     expect(response.status).toBe(500);
+  });
+
+  it("returns 400 instead of crashing on an unparseable absolute-form request target", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
+    server = createServer({ apiRoutes: {}, staticDir: tempDir });
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+    const port = (server!.address() as AddressInfo).port;
+
+    const response = await new Promise<string>((resolvePromise, reject) => {
+      const socket = connect(port, "127.0.0.1", () => {
+        socket.write(
+          "GET http://evil.example:99999/api/status HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+        );
+      });
+      let data = "";
+      socket.on("data", (chunk) => {
+        data += chunk.toString();
+      });
+      socket.on("end", () => resolvePromise(data));
+      socket.on("error", reject);
+      socket.setTimeout(2000, () => reject(new Error("socket timed out waiting for a response")));
+    });
+
+    expect(response).toMatch(/^HTTP\/1\.1 400/);
+  });
+
+  it("does not crash when a route handler's response fails to serialize after headers are already sent", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
+    server = createServer({
+      apiRoutes: { "GET /api/unserializable": () => ({ value: 10n }) },
+      staticDir: tempDir,
+    });
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+
+    // The 200 header is already flushed before JSON.stringify throws on the
+    // BigInt, so a "clean" response isn't possible here — the point of this
+    // test is that the process survives and something comes back, not that
+    // the response is well-formed.
+    await expect(fetch(`${baseUrl()}/api/unserializable`)).resolves.toBeDefined();
   });
 });

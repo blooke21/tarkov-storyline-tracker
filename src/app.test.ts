@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
+import { createServer as createHttpServer } from "node:http";
 import { startApp } from "./app.js";
 import { sampleTasks } from "./tarkovData/__fixtures__/sampleTasks.js";
 
@@ -56,5 +57,35 @@ describe("startApp", () => {
     expect(await indexResponse.text()).toBe("<h1>ok</h1>");
 
     expect(fakeFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects instead of hanging forever when the port is already in use", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-app-test-"));
+    const staticDir = join(tempDir, "public");
+    mkdirSync(staticDir);
+    writeFileSync(join(staticDir, "index.html"), "<h1>ok</h1>");
+    const logsRootDir = join(tempDir, "logs");
+    mkdirSync(logsRootDir);
+    const fakeFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { tasks: sampleTasks } }),
+    });
+
+    const blocker = createHttpServer((_req, res) => res.end());
+    await new Promise<void>((resolve) => blocker.listen(0, "127.0.0.1", resolve));
+    const occupiedPort = (blocker.address() as AddressInfo).port;
+
+    await expect(
+      startApp({
+        port: occupiedPort,
+        logsRootDir,
+        cachePath: join(tempDir, "cache.json"),
+        dbPath: join(tempDir, "progress.sqlite"),
+        staticDir,
+        fetchImpl: fakeFetch as unknown as typeof fetch,
+      })
+    ).rejects.toThrow(/EADDRINUSE/);
+
+    await new Promise<void>((resolve) => blocker.close(() => resolve()));
   });
 });

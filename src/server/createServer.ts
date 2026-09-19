@@ -18,12 +18,34 @@ const MIME_TYPES: Record<string, string> = {
 
 export function createServer(options: ServerOptions): Server {
   return createHttpServer((req, res) => {
-    void handleRequest(req, res, options);
+    handleRequest(req, res, options).catch(() => {
+      // Last-resort safety net: nothing inside handleRequest is expected to
+      // reach here (every known failure mode below has its own guard), but
+      // an uncaught rejection here would otherwise crash the whole process
+      // (see this file's fix history for two ways that used to happen).
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "text/plain" });
+        res.end("Internal server error");
+      } else {
+        res.destroy();
+      }
+    });
   });
 }
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse, options: ServerOptions): Promise<void> {
-  const url = new URL(req.url ?? "/", "http://localhost");
+  let url: URL;
+  try {
+    url = new URL(req.url ?? "/", "http://localhost");
+  } catch {
+    // A syntactically-invalid request target (e.g. an absolute-form target
+    // with an out-of-range port) reaches here as a client-side mistake, not
+    // a server error.
+    res.writeHead(400, { "Content-Type": "text/plain" });
+    res.end("Bad request");
+    return;
+  }
+
   const routeKey = `${req.method} ${url.pathname}`;
   const handler = options.apiRoutes[routeKey];
 
@@ -33,6 +55,18 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, options:
       res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
       res.end(JSON.stringify(body));
     } catch (error) {
+      if (res.headersSent) {
+        // The 200 status was already queued before something failed (e.g.
+        // JSON.stringify choking on an unserializable value) — we can't
+        // send a different status now, so just end the response rather
+        // than calling writeHead again and crashing on
+        // ERR_HTTP_HEADERS_SENT. Note: res.destroy() here would discard
+        // the still-unflushed header block and the client would see the
+        // connection drop with zero bytes rather than a response; res.end()
+        // flushes the pending headers and closes out the body cleanly.
+        res.end();
+        return;
+      }
       const status = (error as { status?: number }).status ?? 500;
       const message = error instanceof Error ? error.message : "Internal error";
       res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });

@@ -57,7 +57,21 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
   });
 
   const server = createServer({ apiRoutes: routes, staticDir });
-  await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(port, "127.0.0.1", () => {
+        server.removeListener("error", reject);
+        resolve();
+      });
+    });
+  } catch (error) {
+    // We already opened the store and started the tailer above — if the
+    // listen fails (e.g. EADDRINUSE), don't leak those open resources.
+    tailer.stop();
+    store.close();
+    throw error;
+  }
 
   return { server, store, tailer };
 }

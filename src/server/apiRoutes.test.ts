@@ -48,7 +48,7 @@ describe("createApiRoutes integration", () => {
     tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
     store = new ProgressStore(":memory:");
     startTestServer();
-    await new Promise<void>((resolve) => server!.listen(0, resolve));
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
 
     const response = await fetch(`${baseUrl()}/api/status`);
     const body = (await response.json()) as { taskGraphFetchedAt: null };
@@ -61,7 +61,7 @@ describe("createApiRoutes integration", () => {
     tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
     store = new ProgressStore(":memory:");
     startTestServer();
-    await new Promise<void>((resolve) => server!.listen(0, resolve));
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
 
     const response = await fetch(`${baseUrl()}/api/progress`);
     const body = (await response.json()) as { overall: { totalTasks: number }; storylines: Array<{ id: string }> };
@@ -76,7 +76,7 @@ describe("createApiRoutes integration", () => {
     store = new ProgressStore(":memory:");
     store.recordEvent("sample-1", "completed");
     startTestServer();
-    await new Promise<void>((resolve) => server!.listen(0, resolve));
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
 
     const response = await fetch(`${baseUrl()}/api/tasks?storyline=kappa`);
     const body = (await response.json()) as { tasks: Array<{ id: string; status: string | null }> };
