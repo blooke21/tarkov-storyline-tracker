@@ -61,7 +61,7 @@
     });
     const label = el("label", {}, checkbox, " ", condition.text);
     if (condition.automatic) {
-      label.append(" ", el("span", { className: "badge" }, "tracked from your quests"));
+      label.append(" ", el("span", { className: "badge" }, `tracked from ${condition.source || "your progress"}`));
     }
     return el("li", { className: "step" + (condition.done ? " done" : "") }, label);
   }

@@ -79,6 +79,7 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
     getStorylines,
     logsRootDir,
     getPrestige: () => prestigeLevels,
+    gameMode,
   });
 
   const server = createServer({ apiRoutes: routes, staticDir });

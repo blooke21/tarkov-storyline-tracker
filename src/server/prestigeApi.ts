@@ -1,6 +1,8 @@
 import { HttpError } from "./createServer.js";
 import type { ProgressStore } from "../progress/store.js";
 import type { PrestigeCondition, PrestigeLevel } from "../prestige/prestigeData.js";
+import { wikiRequirements } from "../prestige/wikiRequirements.js";
+import type { GameMode } from "../tarkovData/gameMode.js";
 import type { TarkovTask } from "../tarkovData/types.js";
 
 export const PRESTIGE_META_KEY = "prestigeProgress";
@@ -10,14 +12,20 @@ export interface PrestigeApiDeps {
   store: ProgressStore;
   getLevels: () => PrestigeLevel[];
   getTasks: () => TarkovTask[];
+  /** A story chapter's name and whether the player marked it done, or undefined for an unknown chapter. */
+  getChapter?: (chapterId: string) => { name: string; done: boolean } | undefined;
+  /** Decides which wiki-only requirements apply (the first PvE prestige has no New Beginning quest). */
+  gameMode?: GameMode;
 }
 
 export interface PrestigeConditionView {
   id: string;
   text: string;
   done: boolean;
-  /** Worked out from the player's quest progress rather than ticked by hand. */
+  /** Worked out by the tracker rather than ticked by hand. */
   automatic: boolean;
+  /** Where an automatic answer comes from, for display ("your quests"). */
+  source: string | null;
 }
 
 export interface PrestigeResponse {
@@ -49,7 +57,7 @@ function readSaved(store: ProgressStore): Saved {
   }
 }
 
-function describe(condition: PrestigeCondition, taskName: (id: string) => string): string {
+function describe(condition: PrestigeCondition, taskName: (id: string) => string, chapterName: (id: string) => string): string {
   switch (condition.kind) {
     case "playerLevel":
       return `Reach player level ${condition.level}`;
@@ -61,6 +69,8 @@ function describe(condition: PrestigeCondition, taskName: (id: string) => string
       return `Have ${condition.count.toLocaleString("en-US")} ${condition.item}`;
     case "task":
       return `Complete the quest "${taskName(condition.taskId)}"`;
+    case "chapter":
+      return `Complete the story chapter "${chapterName(condition.chapterId)}"`;
     case "other":
       return condition.text;
   }
@@ -72,20 +82,28 @@ export function buildPrestigeResponse(deps: PrestigeApiDeps): PrestigeResponse {
   const maxLevel = levels.length ? Math.max(...levels.map((l) => l.level)) : 0;
   const current = Math.min(saved.level, maxLevel);
   const upcoming = levels.find((l) => l.level === current + 1);
+  const getChapter = deps.getChapter ?? (() => undefined);
 
   let next: PrestigeResponse["next"] = null;
   if (upcoming) {
     const names = new Map(deps.getTasks().map((task) => [task.id, task.name]));
     const statuses = deps.store.getAllStatuses();
     const ticked = new Set(saved.done);
-    const conditions = upcoming.conditions.map((condition): PrestigeConditionView => {
-      const automatic = condition.kind === "task";
-      return {
-        id: condition.id,
-        text: describe(condition, (id) => names.get(id) ?? "a quest"),
-        automatic,
-        done: condition.kind === "task" ? statuses.get(condition.taskId) === "completed" : ticked.has(condition.id),
-      };
+    // The feed's requirements, plus the ones it leaves out (see wikiRequirements.ts).
+    const all = [...upcoming.conditions, ...wikiRequirements(upcoming.level, deps.gameMode ?? "pve")];
+    const conditions = all.map((condition): PrestigeConditionView => {
+      const text = describe(
+        condition,
+        (id) => names.get(id) ?? "a quest",
+        (id) => getChapter(id)?.name ?? "a story chapter"
+      );
+      if (condition.kind === "task") {
+        return { id: condition.id, text, automatic: true, source: "your quests", done: statuses.get(condition.taskId) === "completed" };
+      }
+      if (condition.kind === "chapter") {
+        return { id: condition.id, text, automatic: true, source: "your Story chapters", done: getChapter(condition.chapterId)?.done === true };
+      }
+      return { id: condition.id, text, automatic: false, source: null, done: ticked.has(condition.id) };
     });
     next = { level: upcoming.level, conditions, doneCount: conditions.filter((c) => c.done).length, total: conditions.length };
   }

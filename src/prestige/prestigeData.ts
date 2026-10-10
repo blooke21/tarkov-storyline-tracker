@@ -9,6 +9,8 @@ export type PrestigeCondition =
   | { id: string; kind: "haveItem"; item: string; count: number }
   /** Finish a quest — the one kind the tracker can check from the player's quest progress. */
   | { id: string; kind: "task"; taskId: string }
+  /** Finish a story chapter — checked from the player's Story chapters section. */
+  | { id: string; kind: "chapter"; chapterId: string }
   | { id: string; kind: "other"; text: string };
 
 export interface PrestigeLevel {

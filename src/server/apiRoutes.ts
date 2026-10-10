@@ -12,6 +12,7 @@ import { scanLogs } from "./scanApi.js";
 import { setPinned } from "./pinsApi.js";
 import { buildPrestigeResponse, setPrestigeCondition, setPrestigeLevel } from "./prestigeApi.js";
 import type { PrestigeLevel } from "../prestige/prestigeData.js";
+import type { GameMode } from "../tarkovData/gameMode.js";
 import { buildWipeOptions, buildWipePreview, performWipe, parseSince } from "./wipeApi.js";
 
 export interface ApiDeps {
@@ -25,6 +26,8 @@ export interface ApiDeps {
   chapters?: StoryChapter[];
   /** The prestige requirements. Optional: with none, the dashboard says they are unavailable. */
   getPrestige?: () => PrestigeLevel[];
+  /** Which game mode's quests and prestige rules are in use. Defaults to PvE. */
+  gameMode?: GameMode;
 }
 
 // The dashboard sends this on every state-changing request. A web page on some
@@ -42,8 +45,17 @@ function requireTrackerHeader(req: { headers: Record<string, string | string[] |
 
 export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
   const wipeDeps = { store: deps.store, logsRootDir: deps.logsRootDir, getTasks: deps.getTasks };
-  const prestigeDeps = { store: deps.store, getTasks: deps.getTasks, getLevels: deps.getPrestige ?? (() => []) };
   const chapterDeps = { store: deps.store, chapters: deps.chapters ?? STORY_CHAPTERS };
+  const prestigeDeps = {
+    store: deps.store,
+    getTasks: deps.getTasks,
+    getLevels: deps.getPrestige ?? (() => []),
+    gameMode: deps.gameMode,
+    getChapter: (chapterId: string) => {
+      const chapter = buildChaptersResponse(chapterDeps).chapters.find((candidate) => candidate.id === chapterId);
+      return chapter ? { name: chapter.name, done: chapter.status === "done" } : undefined;
+    },
+  };
 
   return {
     "GET /api/status": () => buildStatusResponse(deps.getCache(), deps.store),

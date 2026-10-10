@@ -134,3 +134,50 @@ describe("setPrestigeCondition", () => {
     expect(buildPrestigeResponse(deps).current).toBe(1);
   });
 });
+
+describe("prestige requirements from the wiki", () => {
+  function withChapters(done: Record<string, boolean>): PrestigeApiDeps {
+    const deps = setUp([{ level: 2, conditions: [{ id: "f1", kind: "playerLevel", level: 25 }] }]);
+    setPrestigeLevel({ ...deps, getLevels: () => [{ level: 1, conditions: [] }, ...deps.getLevels()] }, "1");
+    return {
+      ...deps,
+      getLevels: () => [{ level: 1, conditions: [] }, ...deps.getLevels()],
+      getChapter: (id) => (id in done ? { name: id === "tour" ? "Tour" : id, done: done[id] } : undefined),
+    };
+  }
+
+  it("lists the New Beginning quest and the story chapter alongside the feed's requirements", () => {
+    const deps = withChapters({ tour: false });
+
+    const conditions = buildPrestigeResponse(deps).next!.conditions;
+
+    expect(conditions.map((c) => c.text)).toEqual([
+      "Reach player level 25",
+      'Complete the quest "New Beginning (Prestige 2)"',
+      'Complete the story chapter "Tour"',
+    ]);
+  });
+
+  it("checks a chapter from the Story chapters section, and leaves the New Beginning quest to be ticked", () => {
+    const open = buildPrestigeResponse(withChapters({ tour: false })).next!.conditions;
+    const done = buildPrestigeResponse(withChapters({ tour: true })).next!.conditions;
+
+    expect(open[2]).toMatchObject({ automatic: true, done: false, source: "your Story chapters" });
+    expect(done[2]).toMatchObject({ automatic: true, done: true });
+    expect(done[1]).toMatchObject({ automatic: false, done: false, source: null });
+  });
+
+  it("lets the New Beginning quest be ticked, but not an automatic chapter requirement", () => {
+    const deps = withChapters({ tour: false });
+    const newBeginning = buildPrestigeResponse(deps).next!.conditions[1].id;
+
+    expect(setPrestigeCondition(deps, newBeginning, true).next!.conditions[1].done).toBe(true);
+    expect(() => setPrestigeCondition(deps, buildPrestigeResponse(deps).next!.conditions[2].id, true)).toThrow(/automatically/);
+  });
+
+  it("names a chapter generically if it can't be found", () => {
+    const deps = withChapters({});
+
+    expect(buildPrestigeResponse(deps).next!.conditions[2].text).toBe('Complete the story chapter "a story chapter"');
+  });
+});
