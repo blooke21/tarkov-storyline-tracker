@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
@@ -168,5 +168,23 @@ describe("startApp", () => {
     await expect(startApp({ ...config, port: occupiedPort })).rejects.toThrow(/EADDRINUSE/);
 
     await new Promise<void>((resolve) => blocker.close(() => resolve()));
+  });
+
+  it("keeps its saved progress in TARKOV_DATA_DIR when that is set, leaving the project folder alone", async () => {
+    const { config } = setUp();
+    const dataDir = join(tempDir!, "elsewhere");
+    mkdirSync(dataDir);
+    const { cachePath: _cache, dbPath: _db, ...withoutPaths } = config;
+    const saved = process.env.TARKOV_DATA_DIR;
+    process.env.TARKOV_DATA_DIR = dataDir;
+    try {
+      app = await startApp(withoutPaths);
+    } finally {
+      if (saved === undefined) delete process.env.TARKOV_DATA_DIR;
+      else process.env.TARKOV_DATA_DIR = saved;
+    }
+
+    expect(existsSync(join(dataDir, ".tarkov-progress.sqlite"))).toBe(true);
+    expect(existsSync(join(dataDir, ".tarkov-cache.json"))).toBe(true);
   });
 });

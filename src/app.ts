@@ -54,14 +54,17 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
   const gameMode = config.gameMode ?? parseGameMode(process.env.TARKOV_GAME_MODE);
   const port = config.port ?? DEFAULT_PORT;
   const logsRootDir = config.logsRootDir ?? process.env.TARKOV_LOGS_DIR ?? DEFAULT_LOGS_ROOT_DIR;
-  const cachePath = config.cachePath ?? join(PROJECT_ROOT, ".tarkov-cache.json");
-  const dbPath = config.dbPath ?? join(PROJECT_ROOT, ".tarkov-progress.sqlite");
+  // Saved progress and downloaded data live in the project folder unless TARKOV_DATA_DIR points elsewhere
+  // (handy for trying things out without touching your real progress).
+  const dataDir = process.env.TARKOV_DATA_DIR ?? PROJECT_ROOT;
+  const cachePath = config.cachePath ?? join(dataDir, ".tarkov-cache.json");
+  const dbPath = config.dbPath ?? join(dataDir, ".tarkov-progress.sqlite");
   const staticDir = config.staticDir ?? join(PROJECT_ROOT, "public");
 
   const tasks: TarkovTask[] = await syncTaskGraph(cachePath, { fetchImpl: config.fetchImpl, gameMode });
   const prestigeLevels =
     config.prestigeLevels ??
-    (await syncPrestige(config.prestigeCachePath ?? join(PROJECT_ROOT, ".tarkov-prestige-cache.json"), { fetchImpl: config.fetchImpl, gameMode }));
+    (await syncPrestige(config.prestigeCachePath ?? join(dataDir, ".tarkov-prestige-cache.json"), { fetchImpl: config.fetchImpl, gameMode }));
 
   const store = new ProgressStore(dbPath);
 
