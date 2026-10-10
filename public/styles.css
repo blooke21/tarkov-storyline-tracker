@@ -619,3 +619,31 @@ header .reset-panel {
     outline: 2px solid transparent;
   }
 }
+
+.notice.warning {
+  display: block;
+  border: 1px solid #b4443a;
+  border-style: solid;
+  margin: 0.9rem 0 0;
+}
+
+.notice.warning[hidden] {
+  display: none;
+}
+
+.notice.warning p {
+  margin: 0.3rem 0;
+  flex: none;
+  color: var(--text);
+}
+
+.notice.warning p.hint {
+  color: var(--muted);
+}
+
+.notice code {
+  background: var(--bg);
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  word-break: break-all;
+}

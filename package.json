@@ -12,7 +12,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/app.js",
     "wipe": "node dist/wipe.js",
-    "shortcut": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-shortcut.ps1"
+    "shortcut": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-shortcut.ps1",
+    "package": "node scripts/package.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0"

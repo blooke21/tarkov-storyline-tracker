@@ -6,3 +6,4 @@ dist/
 .tarkov-prestige-cache.json
 *.tmp
 .tarkov-wiki-cache/
+release/

@@ -4,6 +4,7 @@ import type { TarkovTask } from "../tarkovData/types.js";
 import type { Storyline } from "../storylines/deriveStorylines.js";
 import type { ProgressStore } from "../progress/store.js";
 import type { TaskCache } from "../tarkovData/cache.js";
+import type { LogsFolderInfo } from "./apiData.js";
 import { buildStatusResponse, buildProgressResponse, buildTasksResponse } from "./apiData.js";
 import { buildChaptersResponse, buildGuideResponse, setChapterPosition, setChapterStatus, setObjectiveDone } from "./chaptersApi.js";
 import { STORY_CHAPTERS } from "../storyChapters/chapters.js";
@@ -29,6 +30,8 @@ export interface ApiDeps {
   getPrestige?: () => PrestigeLevel[];
   /** Which game mode's quests and prestige rules are in use. Defaults to PvE. */
   gameMode?: GameMode;
+  /** Where the game's logs are read from, for the dashboard to show if they can't be found. */
+  logsFolder?: LogsFolderInfo;
   /** The wiki's walkthrough for a quest, by quest id: null for an unknown quest, throws if the wiki can't be reached. */
   getQuestGuide?: (taskId: string) => Promise<QuestGuide | null>;
 }
@@ -61,7 +64,7 @@ export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
   };
 
   return {
-    "GET /api/status": () => buildStatusResponse(deps.getCache(), deps.store),
+    "GET /api/status": () => buildStatusResponse(deps.getCache(), deps.store, deps.logsFolder ?? null),
     "GET /api/progress": () => buildProgressResponse(deps.getTasks(), deps.getStorylines(), deps.store),
     "GET /api/tasks": (url) =>
       buildTasksResponse(deps.getTasks(), deps.getStorylines(), deps.store, {

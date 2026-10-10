@@ -1,3 +1,4 @@
+import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Server } from "node:http";
@@ -12,6 +13,8 @@ import {
 } from "./index.js";
 import { syncPrestige } from "./prestige/prestigeData.js";
 import { createQuestGuideService } from "./wiki/questGuide.js";
+import { findLogsDir } from "./logsLocator.js";
+import type { LogsLocation } from "./logsLocator.js";
 import type { PrestigeLevel } from "./prestige/prestigeData.js";
 import type { TarkovTask, TaskCache, GameMode } from "./index.js";
 import { createServer } from "./server/createServer.js";
@@ -35,13 +38,14 @@ export interface AppConfig {
 }
 
 export interface RunningApp {
+  /** Where the game's logs are being read from. */
+  logs: LogsLocation;
   server: Server;
   store: ProgressStore;
   tailer: LogTailer;
   gameMode: GameMode;
 }
 
-const DEFAULT_LOGS_ROOT_DIR = "C:\\Battlestate Games\\Escape from Tarkov\\Logs";
 
 // 4173 unless TARKOV_PORT says otherwise (e.g. to run a second copy for trying things out).
 const PORT_FROM_ENV = Number(process.env.TARKOV_PORT);
@@ -56,10 +60,15 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
   // (network, database, log reading) happens.
   const gameMode = config.gameMode ?? parseGameMode(process.env.TARKOV_GAME_MODE);
   const port = config.port ?? DEFAULT_PORT;
-  const logsRootDir = config.logsRootDir ?? process.env.TARKOV_LOGS_DIR ?? DEFAULT_LOGS_ROOT_DIR;
   // Saved progress and downloaded data live in the project folder unless TARKOV_DATA_DIR points elsewhere
   // (handy for trying things out without touching your real progress).
   const dataDir = process.env.TARKOV_DATA_DIR ?? PROJECT_ROOT;
+  mkdirSync(dataDir, { recursive: true });
+  // Where the game's logs are: an explicit setting, else found by looking (BSG Launcher's settings, the usual folders).
+  const logs: LogsLocation = config.logsRootDir
+    ? { dir: config.logsRootDir, found: existsSync(config.logsRootDir), source: "TARKOV_LOGS_DIR", tried: [config.logsRootDir] }
+    : findLogsDir({ dataDir });
+  const logsRootDir = logs.dir;
   const cachePath = config.cachePath ?? join(dataDir, ".tarkov-cache.json");
   const dbPath = config.dbPath ?? join(dataDir, ".tarkov-progress.sqlite");
   const staticDir = config.staticDir ?? join(PROJECT_ROOT, "public");
@@ -88,6 +97,7 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
     logsRootDir,
     getPrestige: () => prestigeLevels,
     gameMode,
+    logsFolder: { path: logs.dir, found: logs.found, source: logs.source, tried: logs.tried, settingsFile: join(dataDir, "settings.json") },
     getQuestGuide: async (taskId) => {
       const task = tasks.find((candidate) => candidate.id === taskId);
       return task ? questGuides.get(task.wikiLink) : null;
@@ -111,7 +121,7 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
     throw error;
   }
 
-  return { server, store, tailer, gameMode };
+  return { server, store, tailer, gameMode, logs };
 }
 
 // pathToFileURL (not manual string/URL construction) is the Node-documented
@@ -138,6 +148,12 @@ async function main(): Promise<void> {
   const url = `http://127.0.0.1:${port}`;
   const modeLabel = app.gameMode === "pve" ? "PvE" : "regular";
   console.log(`Tarkov Storyline Tracker running at ${url} (${modeLabel} quests)`);
+  if (app.logs.found) {
+    console.log(`Reading your game logs from ${app.logs.dir} (found via ${app.logs.source}).`);
+  } else {
+    console.log(`WARNING: couldn't find your Escape from Tarkov logs folder. Looked in:\n  ${app.logs.tried.join("\n  ")}`);
+    console.log("Open the tracker in your browser for how to point it at the right folder.");
+  }
   console.log("Leave this window open while you use it. Close it to stop the tracker.");
   if (open) {
     openBrowser(url);

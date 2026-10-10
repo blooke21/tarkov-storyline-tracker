@@ -92,7 +92,32 @@ function renderOverall(overall) {
   `;
 }
 
+// If the game's logs can't be found the tracker has nothing to read, so say how to fix that.
+function renderLogsWarning(logsFolder) {
+  const box = document.getElementById("logs-warning");
+  box.hidden = !logsFolder || logsFolder.found;
+  if (box.hidden) {
+    box.replaceChildren();
+    return;
+  }
+  const where = logsFolder.source === "TARKOV_LOGS_DIR" || logsFolder.source === "settings.json" ? `at ${logsFolder.path}` : "anywhere I looked";
+  box.replaceChildren(
+    el("p", {}, el("strong", {}, "Couldn't find your Escape from Tarkov logs "), `${where}, so no quests can be tracked yet.`),
+    el("p", { className: "hint" }, "Looked in: " + logsFolder.tried.join(" • ")),
+    el(
+      "p",
+      {},
+      "To point the tracker at the right folder, create a file named ",
+      el("code", {}, logsFolder.settingsFile),
+      " containing ",
+      el("code", {}, `{ "logsDir": "D:\\\\Games\\\\Escape from Tarkov\\\\Logs" }`),
+      " (use your own folder, with doubled backslashes), then close and reopen the tracker."
+    )
+  );
+}
+
 function renderStatus(status) {
+  renderLogsWarning(status.logsFolder);
   const line = document.getElementById("status-line");
   const parts = [];
   parts.push(

@@ -20,6 +20,7 @@ describe("buildStatusResponse", () => {
       lastRaidSeenAt: null,
       lastWatcherPollAt: null,
       progressSince: null,
+      logsFolder: null,
     });
   });
 
@@ -34,7 +35,15 @@ describe("buildStatusResponse", () => {
       lastRaidSeenAt: "2026-01-01T00:00:00.000Z",
       lastWatcherPollAt: "2026-01-02T00:00:00.000Z",
       progressSince: null,
+      logsFolder: null,
     });
+  });
+
+  it("passes on where the game's logs are being read from", () => {
+    store = new ProgressStore(":memory:");
+    const logsFolder = { path: "D:\\Logs", found: false, source: "default", tried: ["D:\\Logs"], settingsFile: "C:\\data\\settings.json" };
+
+    expect(buildStatusResponse(null, store, logsFolder).logsFolder).toEqual(logsFolder);
   });
 
   it("reports when tracking was last reset to", () => {

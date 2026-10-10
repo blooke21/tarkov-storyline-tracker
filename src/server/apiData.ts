@@ -10,14 +10,28 @@ export interface StatusResponse {
   lastWatcherPollAt: string | null;
   /** Set when the player has reset their tracked progress; events before it are ignored. */
   progressSince: string | null;
+  /** Where the game's logs are being read from, and whether that folder exists. Null if the app wasn't told. */
+  logsFolder: LogsFolderInfo | null;
 }
 
-export function buildStatusResponse(cache: TaskCache | null, store: ProgressStore): StatusResponse {
+export interface LogsFolderInfo {
+  path: string;
+  found: boolean;
+  /** How the folder was found ("BSG Launcher", "settings.json", ...). */
+  source: string;
+  /** Folders that were checked, shown when nothing was found. */
+  tried: string[];
+  /** The file the player can create to tell the tracker where the logs are. */
+  settingsFile: string;
+}
+
+export function buildStatusResponse(cache: TaskCache | null, store: ProgressStore, logsFolder: LogsFolderInfo | null = null): StatusResponse {
   return {
     taskGraphFetchedAt: cache?.fetchedAt ?? null,
     lastRaidSeenAt: store.getMeta("lastRaidSeenAt"),
     lastWatcherPollAt: store.getMeta("lastWatcherPollAt"),
     progressSince: store.getProgressSince()?.toISOString() ?? null,
+    logsFolder,
   };
 }
 
