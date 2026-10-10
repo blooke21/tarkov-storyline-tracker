@@ -74,54 +74,6 @@
     return post(`/api/chapters/objective?chapter=${encodeURIComponent(chapter.id)}&index=${index}&done=${done ? 1 : 0}`);
   }
 
-  function isHttps(value) {
-    return typeof value === "string" && value.startsWith("https://");
-  }
-
-  function renderBlock(block) {
-    if (block.kind === "text") {
-      return el("p", {}, block.text);
-    }
-    if (block.kind === "heading") {
-      return el("h5", {}, block.text);
-    }
-    if (block.kind === "list") {
-      return el("ul", {}, ...block.items.map((item) => el("li", {}, item)));
-    }
-    if (block.kind === "items") {
-      return el(
-        "div",
-        { className: "guide-items" },
-        el("strong", {}, "You'll need:"),
-        el(
-          "ul",
-          {},
-          ...block.items.map((item) =>
-            el("li", {}, `${item.name}${item.amount ? " ×" + item.amount : ""}${item.note ? " — " + item.note : ""}`)
-          )
-        )
-      );
-    }
-    if (block.kind === "images") {
-      const figures = block.images
-        .filter((image) => isHttps(image.url) && isHttps(image.full))
-        .map((image) => {
-          const picture = el("img", { src: image.url, alt: image.caption || "Screenshot from the wiki", loading: "lazy", referrerPolicy: "no-referrer" });
-          const figure = el(
-            "figure",
-            {},
-            // No referrer: the wiki's image server answers a 404 placeholder to requests that come from 127.0.0.1.
-            el("a", { href: image.full, target: "_blank", rel: "noopener noreferrer", referrerPolicy: "no-referrer", title: "Open the full-size screenshot" }, picture),
-            image.caption ? el("figcaption", {}, image.caption) : ""
-          );
-          picture.addEventListener("error", () => figure.remove());
-          return figure;
-        });
-      return figures.length ? el("div", { className: "guide-images" }, ...figures) : null;
-    }
-    return null;
-  }
-
   function hasGuide(chapter, index) {
     const sections = guides[chapter.id];
     return index !== undefined && Boolean(sections && sections[index]);
@@ -134,7 +86,7 @@
       return null;
     }
     const section = sections[index];
-    const blocks = section.blocks.map(renderBlock).filter(Boolean);
+    const blocks = section.blocks.map(renderGuideBlock).filter(Boolean);
     return el(
       "details",
       { className: "guide", open },

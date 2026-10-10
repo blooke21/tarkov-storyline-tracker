@@ -3,6 +3,9 @@ const state = {
   storylines: [],
   moreLinesOpen: false,
   pendingQuest: null,
+  // Wiki walkthroughs for quests: opened ones, and what has been fetched (a guide, or "loading" / "error").
+  openGuides: new Set(),
+  questGuides: {},
 };
 
 function escapeHtml(value) {
@@ -145,6 +148,106 @@ async function togglePin(task) {
   }
 }
 
+// ---- quest walkthroughs from the wiki (text, items needed, screenshots) ----
+
+async function loadQuestGuide(task) {
+  if (state.questGuides[task.id]) {
+    return;
+  }
+  state.questGuides[task.id] = "loading";
+  try {
+    const response = await fetch(`/api/quests/guide?task=${encodeURIComponent(task.id)}`);
+    if (!response.ok) {
+      throw new Error(`${response.status}`);
+    }
+    state.questGuides[task.id] = await response.json();
+  } catch (error) {
+    console.error("Could not load the quest walkthrough:", error);
+    state.questGuides[task.id] = "error";
+  }
+  rerenderQuestViews();
+}
+
+function rerenderQuestViews() {
+  renderPinned();
+  renderFocus();
+  renderTasks();
+}
+
+function toggleQuestGuide(task) {
+  if (state.openGuides.has(task.id)) {
+    state.openGuides.delete(task.id);
+  } else {
+    state.openGuides.add(task.id);
+    if (state.questGuides[task.id] === "error") {
+      delete state.questGuides[task.id]; // try again
+    }
+    loadQuestGuide(task);
+  }
+  rerenderQuestViews();
+}
+
+function questGuideButton(task) {
+  const open = state.openGuides.has(task.id);
+  return el(
+    "button",
+    {
+      type: "button",
+      className: "link-button",
+      title: "Walkthrough, items you need and screenshots, from the wiki",
+      onclick: () => toggleQuestGuide(task),
+    },
+    open ? "Hide how-to" : "How to do this"
+  );
+}
+
+// The open walkthrough for a quest, or null if it isn't open.
+function questGuideNode(task) {
+  if (!state.openGuides.has(task.id)) {
+    return null;
+  }
+  const guide = state.questGuides[task.id];
+  const box = el("div", { className: "guide quest-guide" });
+  if (!guide || guide === "loading") {
+    box.append(el("p", { className: "hint" }, "Loading the walkthrough from the wiki…"));
+    return box;
+  }
+  if (guide === "error") {
+    box.append(el("p", { className: "hint" }, "Couldn't reach the wiki just now. Click \"Hide how-to\" and open it again to retry."));
+    return box;
+  }
+  if (!guide.found || (guide.sections.length === 0 && guide.rewards.length === 0)) {
+    box.append(el("p", { className: "hint" }, "The wiki has no walkthrough for this quest yet."));
+  }
+  for (const part of guide.sections) {
+    box.append(el("h5", {}, part.title), ...part.blocks.map(renderGuideBlock).filter(Boolean));
+  }
+  if (guide.rewards.length > 0) {
+    box.append(el("h5", {}, "Rewards"), el("ul", {}, ...guide.rewards.map((reward) => el("li", {}, reward))));
+  }
+  if (typeof guide.wikiUrl === "string" && guide.wikiUrl.startsWith("https://")) {
+    box.append(
+      el(
+        "p",
+        { className: "hint" },
+        "Text and screenshots from the ",
+        el("a", { href: guide.wikiUrl, target: "_blank", rel: "noopener noreferrer", referrerPolicy: "no-referrer" }, "Escape from Tarkov wiki"),
+        " (CC BY-SA)."
+      )
+    );
+  }
+  return box;
+}
+
+// Adds the "How to do this" button and, when it's open, the walkthrough to a quest card.
+function addQuestGuide(card, task) {
+  card.append(" ", questGuideButton(task));
+  const node = questGuideNode(task);
+  if (node) {
+    card.append(node);
+  }
+}
+
 function pinButton(task) {
   return el(
     "button",
@@ -186,6 +289,7 @@ function renderPinned() {
       card.append(el("a", { href: task.wikiLink, target: "_blank", rel: "noopener" }, "View on wiki"), " ");
     }
     card.append(pinButton(task));
+    addQuestGuide(card, task);
     nodes.push(card);
   }
   if (doneCount > 0) {
@@ -333,6 +437,7 @@ function renderFocus() {
       card.append(el("a", { href: task.wikiLink, target: "_blank", rel: "noopener" }, "View on wiki"), " ");
     }
     card.append(pinButton(task));
+    addQuestGuide(card, task);
     nodes.push(card);
   }
 
@@ -431,6 +536,7 @@ function renderTasks() {
       card.append(" ");
     }
     card.append(pinButton(task));
+    addQuestGuide(card, task);
     container.appendChild(card);
   }
 }

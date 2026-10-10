@@ -13,6 +13,7 @@ import { setPinned } from "./pinsApi.js";
 import { buildPrestigeResponse, setPrestigeCondition, setPrestigeLevel } from "./prestigeApi.js";
 import type { PrestigeLevel } from "../prestige/prestigeData.js";
 import type { GameMode } from "../tarkovData/gameMode.js";
+import type { QuestGuide } from "../wiki/questGuide.js";
 import { buildWipeOptions, buildWipePreview, performWipe, parseSince } from "./wipeApi.js";
 
 export interface ApiDeps {
@@ -28,6 +29,8 @@ export interface ApiDeps {
   getPrestige?: () => PrestigeLevel[];
   /** Which game mode's quests and prestige rules are in use. Defaults to PvE. */
   gameMode?: GameMode;
+  /** The wiki's walkthrough for a quest, by quest id: null for an unknown quest, throws if the wiki can't be reached. */
+  getQuestGuide?: (taskId: string) => Promise<QuestGuide | null>;
 }
 
 // The dashboard sends this on every state-changing request. A web page on some
@@ -86,6 +89,23 @@ export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
         url.searchParams.get("task"),
         url.searchParams.get("pinned") === "1"
       );
+    },
+
+    "GET /api/quests/guide": async (url) => {
+      if (!deps.getQuestGuide) {
+        throw new HttpError(404, "Quest walkthroughs aren't available");
+      }
+      const taskId = url.searchParams.get("task") ?? "";
+      let guide: QuestGuide | null;
+      try {
+        guide = await deps.getQuestGuide(taskId);
+      } catch (error) {
+        throw new HttpError(502, `Couldn't get the walkthrough from the wiki (${error instanceof Error ? error.message : "unknown error"})`);
+      }
+      if (!guide) {
+        throw new HttpError(404, `No walkthrough for quest "${taskId}"`);
+      }
+      return guide;
     },
 
     "GET /api/prestige": () => buildPrestigeResponse(prestigeDeps),

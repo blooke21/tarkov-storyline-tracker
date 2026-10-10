@@ -355,3 +355,47 @@ describe("prestige routes over HTTP", () => {
     expect(body.available).toBe(false);
   });
 });
+
+describe("quest walkthrough route over HTTP", () => {
+  async function boot(getQuestGuide?: (taskId: string) => Promise<unknown>): Promise<void> {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
+    store = new ProgressStore(":memory:");
+    const routes = createApiRoutes({
+      store,
+      getCache: () => null,
+      getTasks: () => sampleTasks,
+      getStorylines: () => [],
+      logsRootDir: join(tempDir, "logs"),
+      getQuestGuide: getQuestGuide as never,
+    });
+    server = createServer({ apiRoutes: routes, staticDir: tempDir });
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+  }
+
+  it("returns the walkthrough the app builds for a quest", async () => {
+    await boot(async (id) => (id === "sample-1" ? { wikiUrl: "https://w.test/Debut", found: true, sections: [], rewards: ["+1 EXP"] } : null));
+
+    const response = await fetch(`${baseUrl()}/api/quests/guide?task=sample-1`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ found: true, rewards: ["+1 EXP"] });
+  });
+
+  it("answers 404 for a quest it doesn't know and 502 when the wiki can't be reached", async () => {
+    await boot(async (id) => {
+      if (id === "boom") throw new Error("The wiki answered 503");
+      return null;
+    });
+
+    expect((await fetch(`${baseUrl()}/api/quests/guide?task=nope`)).status).toBe(404);
+    const failed = await fetch(`${baseUrl()}/api/quests/guide?task=boom`);
+    expect(failed.status).toBe(502);
+    expect(await failed.text()).toMatch(/wiki/i);
+  });
+
+  it("isn't offered when the app has no walkthrough source", async () => {
+    await boot();
+
+    expect((await fetch(`${baseUrl()}/api/quests/guide?task=sample-1`)).status).toBe(404);
+  });
+});

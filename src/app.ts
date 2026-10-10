@@ -11,6 +11,7 @@ import {
   parseGameMode,
 } from "./index.js";
 import { syncPrestige } from "./prestige/prestigeData.js";
+import { createQuestGuideService } from "./wiki/questGuide.js";
 import type { PrestigeLevel } from "./prestige/prestigeData.js";
 import type { TarkovTask, TaskCache, GameMode } from "./index.js";
 import { createServer } from "./server/createServer.js";
@@ -69,6 +70,8 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
     (await syncPrestige(config.prestigeCachePath ?? join(dataDir, ".tarkov-prestige-cache.json"), { fetchImpl: config.fetchImpl, gameMode }));
 
   const store = new ProgressStore(dbPath);
+  // Quest walkthroughs are fetched from the wiki the first time a quest's guide is opened, then kept on disk.
+  const questGuides = createQuestGuideService({ cacheDir: join(dataDir, ".tarkov-wiki-cache") });
 
   runBackfill(logsRootDir, store);
 
@@ -85,6 +88,10 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
     logsRootDir,
     getPrestige: () => prestigeLevels,
     gameMode,
+    getQuestGuide: async (taskId) => {
+      const task = tasks.find((candidate) => candidate.id === taskId);
+      return task ? questGuides.get(task.wikiLink) : null;
+    },
   });
 
   const server = createServer({ apiRoutes: routes, staticDir });
