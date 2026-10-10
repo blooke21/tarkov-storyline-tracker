@@ -26,8 +26,11 @@ export interface PrestigeConditionView {
   automatic: boolean;
   /** Where an automatic answer comes from, for display ("your quests"). */
   source: string | null;
-  /** A page about this requirement: the quest's wiki page, or the chapter in the dashboard. */
-  link: { url: string; external: boolean } | null;
+  /**
+   * Where the requirement leads: a quest in the dashboard's quest list (taskId set), a chapter in the
+   * dashboard, or a wiki page for something the dashboard doesn't have (external).
+   */
+  link: { url: string; external: boolean; taskId?: string } | null;
 }
 
 export interface PrestigeResponse {
@@ -101,13 +104,13 @@ export function buildPrestigeResponse(deps: PrestigeApiDeps): PrestigeResponse {
         (id) => getChapter(id)?.name ?? "a story chapter"
       );
       if (condition.kind === "task") {
-        const wiki = tasksById.get(condition.taskId)?.wikiLink;
+        const listed = tasksById.has(condition.taskId);
         return {
           id: condition.id,
           text,
           automatic: true,
           source: "your quests",
-          link: wiki ? { url: wiki, external: true } : null,
+          link: listed ? { url: `#quest/${encodeURIComponent(condition.taskId)}`, external: false, taskId: condition.taskId } : null,
           done: statuses.get(condition.taskId) === "completed",
         };
       }

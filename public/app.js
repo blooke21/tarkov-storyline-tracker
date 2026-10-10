@@ -2,6 +2,7 @@ const state = {
   tasks: [],
   storylines: [],
   moreLinesOpen: false,
+  pendingQuest: null,
 };
 
 function escapeHtml(value) {
@@ -40,11 +41,43 @@ async function loadData() {
     renderStorylines(state.storylines);
     renderFocus();
     renderTasks();
+    if (state.pendingQuest) {
+      const id = state.pendingQuest;
+      state.pendingQuest = null;
+      showQuest(id);
+    }
   } catch (error) {
     console.error("Failed to load dashboard data:", error);
     const line = document.getElementById("status-line");
     line.textContent = "Could not reach the local server — retrying...";
   }
+}
+
+// Jump to one quest in the list: clear every filter that could hide it, scroll
+// to it and flash it. Used by links elsewhere on the page (e.g. prestige).
+function showQuest(taskId) {
+  if (state.tasks.length === 0) {
+    state.pendingQuest = taskId; // the list isn't loaded yet; loadData finishes the job
+    return;
+  }
+  for (const id of ["filter-storyline", "filter-trader", "filter-map"]) {
+    document.getElementById(id).value = "";
+  }
+  document.getElementById("filter-actionable").checked = false;
+  document.getElementById("filter-hide-completed").checked = false;
+  renderStorylines(state.storylines);
+  renderFocus();
+  renderTasks();
+
+  const card = document.getElementById(`task-${taskId}`);
+  if (!card) {
+    return;
+  }
+  card.scrollIntoView({ block: "center" });
+  card.classList.remove("flash");
+  void card.offsetWidth; // restart the animation if it is flashing already
+  card.classList.add("flash");
+  setTimeout(() => card.classList.remove("flash"), 2600);
 }
 
 function renderOverall(overall) {
@@ -372,6 +405,7 @@ function renderTasks() {
   for (const task of filtered) {
     const card = document.createElement("div");
     card.className = "task-card" + (task.status === "completed" ? " completed" : "");
+    card.id = `task-${task.id}`;
     const badges = [];
     if (task.actionable && task.status !== "completed") {
       badges.push('<span class="badge actionable">Next up</span>');

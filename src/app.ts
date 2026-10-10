@@ -42,7 +42,9 @@ export interface RunningApp {
 
 const DEFAULT_LOGS_ROOT_DIR = "C:\\Battlestate Games\\Escape from Tarkov\\Logs";
 
-const DEFAULT_PORT = 4173;
+// 4173 unless TARKOV_PORT says otherwise (e.g. to run a second copy for trying things out).
+const PORT_FROM_ENV = Number(process.env.TARKOV_PORT);
+const DEFAULT_PORT = Number.isInteger(PORT_FROM_ENV) && PORT_FROM_ENV > 0 && PORT_FROM_ENV < 65536 ? PORT_FROM_ENV : 4173;
 
 // The project folder (one above src/ or dist/), so the app finds its database
 // and web files no matter which folder a desktop shortcut starts it from.

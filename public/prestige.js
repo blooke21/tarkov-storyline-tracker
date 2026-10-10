@@ -53,7 +53,7 @@
 
   // Only https links to other sites, or a chapter in this page, are ever put on the page.
   function isSafeLink(link) {
-    return link.external ? typeof link.url === "string" && link.url.startsWith("https://") : /^#chapter\//.test(link.url);
+    return link.external ? typeof link.url === "string" && link.url.startsWith("https://") : /^#(chapter|quest)\//.test(link.url);
   }
 
   function conditionRow(condition) {
@@ -66,11 +66,25 @@
     });
     const label = el("label", {}, checkbox, " ");
     if (condition.link && isSafeLink(condition.link)) {
-      // Quests open on the wiki in a new tab; story chapters open in this dashboard.
-      const props = condition.link.external
-        ? { href: condition.link.url, target: "_blank", rel: "noopener noreferrer", referrerPolicy: "no-referrer", title: "Open the wiki page" }
-        : { href: condition.link.url, title: "Open this chapter" };
-      label.append(el("a", props, condition.text));
+      // A quest jumps to it in the quest list below; a chapter opens in this dashboard;
+      // anything the dashboard doesn't have (the New Beginning quests) opens on the wiki.
+      let anchor;
+      if (condition.link.taskId && typeof showQuest === "function") {
+        anchor = el("a", { href: condition.link.url, title: "Show this quest in the quest list" }, condition.text);
+        anchor.addEventListener("click", (event) => {
+          event.preventDefault();
+          showQuest(condition.link.taskId);
+        });
+      } else if (condition.link.external) {
+        anchor = el(
+          "a",
+          { href: condition.link.url, target: "_blank", rel: "noopener noreferrer", referrerPolicy: "no-referrer", title: "Open the wiki page" },
+          condition.text
+        );
+      } else {
+        anchor = el("a", { href: condition.link.url, title: "Open this chapter" }, condition.text);
+      }
+      label.append(anchor);
     } else {
       label.append(condition.text);
     }

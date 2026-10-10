@@ -604,3 +604,18 @@ header .notice {
 header .reset-panel {
   margin: 0.75rem 0 0;
 }
+
+/* A quest the player was just sent to */
+.task-card.flash {
+  animation: flash-quest 2.6s ease-out;
+}
+
+@keyframes flash-quest {
+  0%, 60% {
+    outline: 2px solid var(--accent);
+    background: #20281f;
+  }
+  100% {
+    outline: 2px solid transparent;
+  }
+}

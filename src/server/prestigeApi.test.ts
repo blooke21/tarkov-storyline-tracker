@@ -183,13 +183,13 @@ describe("prestige requirements from the wiki", () => {
 });
 
 describe("prestige requirement links", () => {
-  it("links a quest requirement to the quest's wiki page, and a chapter to the dashboard's chapter view", () => {
+  it("links a quest requirement to the quest in the dashboard, and a chapter to the dashboard's chapter view", () => {
     const deps: PrestigeApiDeps = {
       ...setUp([{ level: 1, conditions: [{ id: "q", kind: "task", taskId: "sample-1" }] }, { level: 2, conditions: [] }]),
       getChapter: () => ({ name: "Tour", done: false }),
     };
     const first = buildPrestigeResponse(deps).next!.conditions;
-    expect(first[0].link).toEqual({ url: sampleTasks[0].wikiLink, external: true });
+    expect(first[0].link).toEqual({ url: "#quest/sample-1", external: false, taskId: "sample-1" });
 
     setPrestigeLevel(deps, "1");
     const second = buildPrestigeResponse(deps).next!.conditions;
@@ -200,11 +200,10 @@ describe("prestige requirement links", () => {
     });
   });
 
-  it("has no link for a requirement that isn't a quest, and none for a quest with no wiki page", () => {
-    const task = { ...sampleTasks[0], id: "no-wiki", wikiLink: null };
+  it("has no link for a requirement that isn't a quest, nor for a quest the dashboard doesn't have", () => {
     const deps: PrestigeApiDeps = {
-      ...setUp([{ level: 1, conditions: [{ id: "q", kind: "task", taskId: "no-wiki" }, { id: "l", kind: "playerLevel", level: 15 }] }]),
-      getTasks: () => [task],
+      ...setUp([{ level: 1, conditions: [{ id: "q", kind: "task", taskId: "not-in-the-list" }, { id: "l", kind: "playerLevel", level: 15 }] }]),
+      getTasks: () => [],
     };
 
     const conditions = buildPrestigeResponse(deps).next!.conditions;
