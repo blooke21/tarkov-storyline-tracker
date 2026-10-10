@@ -110,7 +110,8 @@
           const figure = el(
             "figure",
             {},
-            el("a", { href: image.full, target: "_blank", rel: "noopener", title: "Open the full-size screenshot" }, picture),
+            // No referrer: the wiki's image server answers a 404 placeholder to requests that come from 127.0.0.1.
+            el("a", { href: image.full, target: "_blank", rel: "noopener noreferrer", referrerPolicy: "no-referrer", title: "Open the full-size screenshot" }, picture),
             image.caption ? el("figcaption", {}, image.caption) : ""
           );
           picture.addEventListener("error", () => figure.remove());

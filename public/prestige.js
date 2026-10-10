@@ -51,6 +51,11 @@
     return el("label", {}, "I'm currently at ", select);
   }
 
+  // Only https links to other sites, or a chapter in this page, are ever put on the page.
+  function isSafeLink(link) {
+    return link.external ? typeof link.url === "string" && link.url.startsWith("https://") : /^#chapter\//.test(link.url);
+  }
+
   function conditionRow(condition) {
     const checkbox = el("input", {
       type: "checkbox",
@@ -59,7 +64,16 @@
       onchange: (event) =>
         post(`/api/prestige/requirement?requirement=${encodeURIComponent(condition.id)}&done=${event.target.checked ? 1 : 0}`),
     });
-    const label = el("label", {}, checkbox, " ", condition.text);
+    const label = el("label", {}, checkbox, " ");
+    if (condition.link && isSafeLink(condition.link)) {
+      // Quests open on the wiki in a new tab; story chapters open in this dashboard.
+      const props = condition.link.external
+        ? { href: condition.link.url, target: "_blank", rel: "noopener noreferrer", referrerPolicy: "no-referrer", title: "Open the wiki page" }
+        : { href: condition.link.url, title: "Open this chapter" };
+      label.append(el("a", props, condition.text));
+    } else {
+      label.append(condition.text);
+    }
     if (condition.automatic) {
       label.append(" ", el("span", { className: "badge" }, `tracked from ${condition.source || "your progress"}`));
     }

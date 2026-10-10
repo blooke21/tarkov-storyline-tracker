@@ -181,3 +181,34 @@ describe("prestige requirements from the wiki", () => {
     expect(buildPrestigeResponse(deps).next!.conditions[2].text).toBe('Complete the story chapter "a story chapter"');
   });
 });
+
+describe("prestige requirement links", () => {
+  it("links a quest requirement to the quest's wiki page, and a chapter to the dashboard's chapter view", () => {
+    const deps: PrestigeApiDeps = {
+      ...setUp([{ level: 1, conditions: [{ id: "q", kind: "task", taskId: "sample-1" }] }, { level: 2, conditions: [] }]),
+      getChapter: () => ({ name: "Tour", done: false }),
+    };
+    const first = buildPrestigeResponse(deps).next!.conditions;
+    expect(first[0].link).toEqual({ url: sampleTasks[0].wikiLink, external: true });
+
+    setPrestigeLevel(deps, "1");
+    const second = buildPrestigeResponse(deps).next!.conditions;
+    expect(second.find((c) => c.id.startsWith("wiki-chapter"))?.link).toEqual({ url: "#chapter/tour", external: false });
+    expect(second.find((c) => c.id.startsWith("wiki-new-beginning"))?.link).toEqual({
+      url: "https://escapefromtarkov.fandom.com/wiki/New_Beginning_(Prestige_2)",
+      external: true,
+    });
+  });
+
+  it("has no link for a requirement that isn't a quest, and none for a quest with no wiki page", () => {
+    const task = { ...sampleTasks[0], id: "no-wiki", wikiLink: null };
+    const deps: PrestigeApiDeps = {
+      ...setUp([{ level: 1, conditions: [{ id: "q", kind: "task", taskId: "no-wiki" }, { id: "l", kind: "playerLevel", level: 15 }] }]),
+      getTasks: () => [task],
+    };
+
+    const conditions = buildPrestigeResponse(deps).next!.conditions;
+
+    expect(conditions.map((c) => c.link)).toEqual([null, null]);
+  });
+});

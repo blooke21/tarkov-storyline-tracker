@@ -590,3 +590,17 @@ body.viewing-chapter #browse {
 #prestige label select {
   margin-left: 0.4rem;
 }
+
+/* The "Numbers look wrong?" box lives in the header, in the same column as the page */
+.header-inner {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+header .notice {
+  margin: 0.9rem 0 0;
+}
+
+header .reset-panel {
+  margin: 0.75rem 0 0;
+}

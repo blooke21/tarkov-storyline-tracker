@@ -11,7 +11,7 @@ export type PrestigeCondition =
   | { id: string; kind: "task"; taskId: string }
   /** Finish a story chapter — checked from the player's Story chapters section. */
   | { id: string; kind: "chapter"; chapterId: string }
-  | { id: string; kind: "other"; text: string };
+  | { id: string; kind: "other"; text: string; /** A page about it, if there is one. */ url?: string };
 
 export interface PrestigeLevel {
   level: number;

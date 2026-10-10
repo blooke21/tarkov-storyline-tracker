@@ -26,6 +26,8 @@ export interface PrestigeConditionView {
   automatic: boolean;
   /** Where an automatic answer comes from, for display ("your quests"). */
   source: string | null;
+  /** A page about this requirement: the quest's wiki page, or the chapter in the dashboard. */
+  link: { url: string; external: boolean } | null;
 }
 
 export interface PrestigeResponse {
@@ -86,7 +88,8 @@ export function buildPrestigeResponse(deps: PrestigeApiDeps): PrestigeResponse {
 
   let next: PrestigeResponse["next"] = null;
   if (upcoming) {
-    const names = new Map(deps.getTasks().map((task) => [task.id, task.name]));
+    const tasksById = new Map(deps.getTasks().map((task) => [task.id, task]));
+    const names = new Map([...tasksById].map(([id, task]) => [id, task.name]));
     const statuses = deps.store.getAllStatuses();
     const ticked = new Set(saved.done);
     // The feed's requirements, plus the ones it leaves out (see wikiRequirements.ts).
@@ -98,12 +101,28 @@ export function buildPrestigeResponse(deps: PrestigeApiDeps): PrestigeResponse {
         (id) => getChapter(id)?.name ?? "a story chapter"
       );
       if (condition.kind === "task") {
-        return { id: condition.id, text, automatic: true, source: "your quests", done: statuses.get(condition.taskId) === "completed" };
+        const wiki = tasksById.get(condition.taskId)?.wikiLink;
+        return {
+          id: condition.id,
+          text,
+          automatic: true,
+          source: "your quests",
+          link: wiki ? { url: wiki, external: true } : null,
+          done: statuses.get(condition.taskId) === "completed",
+        };
       }
       if (condition.kind === "chapter") {
-        return { id: condition.id, text, automatic: true, source: "your Story chapters", done: getChapter(condition.chapterId)?.done === true };
+        return {
+          id: condition.id,
+          text,
+          automatic: true,
+          source: "your Story chapters",
+          link: { url: `#chapter/${encodeURIComponent(condition.chapterId)}`, external: false },
+          done: getChapter(condition.chapterId)?.done === true,
+        };
       }
-      return { id: condition.id, text, automatic: false, source: null, done: ticked.has(condition.id) };
+      const url = condition.kind === "other" ? condition.url : undefined;
+      return { id: condition.id, text, automatic: false, source: null, link: url ? { url, external: true } : null, done: ticked.has(condition.id) };
     });
     next = { level: upcoming.level, conditions, doneCount: conditions.filter((c) => c.done).length, total: conditions.length };
   }

@@ -17,6 +17,7 @@ const CHAPTERS_NEEDED: Record<number, string[]> = {
 };
 
 const NEEDS_TICKET = new Set([4, 5]);
+const WIKI = "https://escapefromtarkov.fandom.com/wiki/";
 
 export function wikiRequirements(level: number, gameMode: GameMode): PrestigeCondition[] {
   const requirements: PrestigeCondition[] = [];
@@ -27,6 +28,7 @@ export function wikiRequirements(level: number, gameMode: GameMode): PrestigeCon
       id: `wiki-new-beginning-${level}`,
       kind: "other",
       text: `Complete the quest "New Beginning (Prestige ${level})"`,
+      url: `${WIKI}New_Beginning_(Prestige_${level})`,
     });
   }
   for (const chapterId of CHAPTERS_NEEDED[level] ?? []) {
@@ -37,6 +39,7 @@ export function wikiRequirements(level: number, gameMode: GameMode): PrestigeCon
       id: `wiki-ticket-${level}`,
       kind: "other",
       text: "Obtain the Ticket from Tarkov (Kruglov's RFID keycard) in the story",
+      url: `${WIKI}Kruglov%27s_RFID_keycard`,
     });
   }
   return requirements;
