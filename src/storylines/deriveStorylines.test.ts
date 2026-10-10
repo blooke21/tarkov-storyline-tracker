@@ -34,7 +34,7 @@ describe("deriveStorylines", () => {
     expect(lightkeeper?.taskIds).toEqual(["1"]);
   });
 
-  it("groups tasks with the real API's 'Any' faction sentinel into Main Story, not USEC/BEAR", () => {
+  it("groups tasks with the real API's 'Any' faction sentinel into Side Quests, not USEC/BEAR", () => {
     const tasks = [
       makeTask({ id: "1", factionName: "USEC" }),
       makeTask({ id: "2", factionName: "BEAR" }),
@@ -43,13 +43,13 @@ describe("deriveStorylines", () => {
     const storylines = deriveStorylines(tasks);
     expect(storylines.find((s) => s.id === "usec")?.taskIds).toEqual(["1"]);
     expect(storylines.find((s) => s.id === "bear")?.taskIds).toEqual(["2"]);
-    expect(storylines.find((s) => s.id === "main-story")?.taskIds).toEqual(["3"]);
+    expect(storylines.find((s) => s.id === "side-quests")?.taskIds).toEqual(["3"]);
   });
 
-  it("treats a null factionName as Main Story too, as a defensive fallback", () => {
+  it("treats a null factionName as Side Quests too, as a defensive fallback", () => {
     const tasks = [makeTask({ id: "1", factionName: null })];
     const storylines = deriveStorylines(tasks);
-    expect(storylines.find((s) => s.id === "main-story")?.taskIds).toEqual(["1"]);
+    expect(storylines.find((s) => s.id === "side-quests")?.taskIds).toEqual(["1"]);
   });
 
   it("allows a task to appear in more than one storyline", () => {

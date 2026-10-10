@@ -9,6 +9,7 @@ import { buildChaptersResponse, setChapterPosition, setChapterStatus, setObjecti
 import { STORY_CHAPTERS } from "../storyChapters/chapters.js";
 import type { StoryChapter } from "../storyChapters/types.js";
 import { scanLogs } from "./scanApi.js";
+import { setPinned } from "./pinsApi.js";
 import { buildWipeOptions, buildWipePreview, performWipe, parseSince } from "./wipeApi.js";
 
 export interface ApiDeps {
@@ -59,6 +60,15 @@ export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
     "POST /api/scan": (_url, req) => {
       requireTrackerHeader(req);
       return scanLogs(wipeDeps);
+    },
+
+    "POST /api/pins": (url, req) => {
+      requireTrackerHeader(req);
+      return setPinned(
+        { store: deps.store, getTasks: deps.getTasks },
+        url.searchParams.get("task"),
+        url.searchParams.get("pinned") === "1"
+      );
     },
 
     "GET /api/chapters": () => buildChaptersResponse(chapterDeps),

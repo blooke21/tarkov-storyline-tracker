@@ -294,3 +294,25 @@ describe("chapter position route over HTTP", () => {
     expect(tour.objectives.slice(0, 4).map((o) => o.done)).toEqual([true, true, true, false]);
   });
 });
+
+describe("pin route over HTTP", () => {
+  it("needs the tracker header, then pins and unpins, and shows up in /api/tasks", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
+    store = new ProgressStore(":memory:");
+    startTestServer();
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+    const pin = (flag: number, headers?: Record<string, string>) =>
+      fetch(`${baseUrl()}/api/pins?task=sample-1&pinned=${flag}`, { method: "POST", headers });
+
+    expect((await pin(1)).status).toBe(403);
+
+    const pinned = (await (await pin(1, TRACKER_HEADER)).json()) as { pinned: string[] };
+    expect(pinned.pinned).toEqual(["sample-1"]);
+    const tasks = (await (await fetch(`${baseUrl()}/api/tasks`)).json()) as { tasks: Array<{ id: string; pinned: boolean }> };
+    expect(tasks.tasks.find((t) => t.id === "sample-1")?.pinned).toBe(true);
+
+    expect(((await (await pin(0, TRACKER_HEADER)).json()) as { pinned: string[] }).pinned).toEqual([]);
+    const missing = await fetch(`${baseUrl()}/api/pins?task=nope&pinned=1`, { method: "POST", headers: TRACKER_HEADER });
+    expect(missing.status).toBe(404);
+  });
+});

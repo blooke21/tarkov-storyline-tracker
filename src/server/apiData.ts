@@ -2,6 +2,7 @@ import type { TarkovTask } from "../tarkovData/types.js";
 import type { TaskCache } from "../tarkovData/cache.js";
 import type { Storyline } from "../storylines/deriveStorylines.js";
 import type { ProgressStore, TaskStatus } from "../progress/store.js";
+import { readPins } from "./pinsApi.js";
 
 export interface StatusResponse {
   taskGraphFetchedAt: string | null;
@@ -70,6 +71,8 @@ export interface TaskResponseItem {
   wikiLink: string | null;
   status: TaskStatus | null;
   actionable: boolean;
+  /** The player pinned this quest in the dashboard. */
+  pinned: boolean;
   objectives: Array<{ description: string; optional: boolean }>;
   storylineIds: string[];
 }
@@ -103,6 +106,7 @@ export function buildTasksResponse(
   filter: TasksFilter = {}
 ): TasksResponse {
   const statuses = store.getAllStatuses();
+  const pins = new Set(readPins(store));
   const storylinesByTaskId = new Map<string, string[]>();
   for (const storyline of storylines) {
     for (const taskId of storyline.taskIds) {
@@ -124,6 +128,7 @@ export function buildTasksResponse(
       wikiLink: task.wikiLink,
       status: statuses.get(task.id) ?? null,
       actionable: isActionable(task, statuses),
+      pinned: pins.has(task.id),
       objectives: task.objectives.map((objective) => ({
         description: objective.description,
         optional: objective.optional,

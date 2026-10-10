@@ -4,7 +4,7 @@ export interface Storyline {
   id: string;
   name: string;
   taskIds: string[];
-  /** "chain" = a run of "<Name> - Part N" quests; absent for the big built-in lines (Kappa, Main Story, ...). */
+  /** "chain" = a run of "<Name> - Part N" quests; absent for the big built-in lines (Kappa, Side Quests, ...). */
   kind?: "chain";
 }
 
@@ -43,8 +43,8 @@ export function deriveStorylines(tasks: TarkovTask[]): Storyline[] {
       taskIds: tasks.filter((t) => t.lightkeeperRequired).map((t) => t.id),
     },
     {
-      id: "main-story",
-      name: "Main Story",
+      id: "side-quests",
+      name: "Side Quests",
       taskIds: tasks.filter((t) => isMainStoryFaction(t.factionName)).map((t) => t.id),
     },
     { id: "usec", name: "USEC", taskIds: tasks.filter((t) => t.factionName === "USEC").map((t) => t.id) },

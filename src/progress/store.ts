@@ -14,6 +14,8 @@ interface MetaRow {
 const PROGRESS_SINCE_KEY = "progressSince";
 /** Where the player's hand-kept story-chapter progress lives (see server/chaptersApi.ts). */
 export const STORY_CHAPTERS_META_KEY = "storyChapterProgress";
+/** The quests the player pinned in the dashboard (see server/pinsApi.ts). */
+export const PINNED_TASKS_META_KEY = "pinnedTasks";
 
 export class ProgressStore {
   private db: Database.Database;
@@ -76,7 +78,7 @@ export class ProgressStore {
 
   /**
    * Starts tracking from scratch, e.g. after the player resets their
-   * character. Forgets every recorded task (and story-chapter progress) and remembers `since`: from then
+   * character. Forgets every recorded task (and story-chapter progress and pins) and remembers `since`: from then
    * on, log events older than that moment are ignored. The boundary is what
    * makes the wipe stick — without it, the next restart would re-read the old
    * logs and bring the previous character's progress straight back.
@@ -86,6 +88,7 @@ export class ProgressStore {
       this.db.prepare(`DELETE FROM task_progress`).run();
       // A new character starts the story over too.
       this.db.prepare(`DELETE FROM store_meta WHERE key = ?`).run(STORY_CHAPTERS_META_KEY);
+      this.db.prepare(`DELETE FROM store_meta WHERE key = ?`).run(PINNED_TASKS_META_KEY);
       this.setMeta(PROGRESS_SINCE_KEY, since.toISOString());
     });
     wipe();

@@ -36,6 +36,7 @@ async function loadData() {
     renderStatus(status);
     renderOverall(progress.overall);
     populateFilters(state.tasks);
+    renderPinned();
     renderStorylines(state.storylines);
     renderFocus();
     renderTasks();
@@ -83,6 +84,81 @@ function el(tag, props, ...children) {
   }
   node.append(...children);
   return node;
+}
+
+// Sent on the one kind of request that changes saved data, so a page on some
+// other site can't make your browser do it (see the note in reset.js).
+const TRACKER_WRITE_HEADERS = { "X-Requested-With": "tarkov-tracker" };
+
+// The game doesn't write its own quest pins to any log, so pins are the
+// tracker's own: click Pin on a quest and it shows at the top of the page.
+async function togglePin(task) {
+  const pin = !task.pinned;
+  try {
+    const response = await fetch(`/api/pins?task=${encodeURIComponent(task.id)}&pinned=${pin ? 1 : 0}`, {
+      method: "POST",
+      headers: TRACKER_WRITE_HEADERS,
+    });
+    if (!response.ok) {
+      throw new Error(`${response.status}`);
+    }
+    task.pinned = pin;
+    renderPinned();
+    renderFocus();
+    renderTasks();
+  } catch (error) {
+    console.error("Could not save the pin:", error);
+    alert("Could not save that pin — is the tracker still running?");
+  }
+}
+
+function pinButton(task) {
+  return el(
+    "button",
+    {
+      type: "button",
+      className: "link-button",
+      title: task.pinned ? "Remove from the pinned list at the top" : "Show this quest at the top of the page",
+      onclick: () => togglePin(task),
+    },
+    task.pinned ? "📌 Unpin" : "📌 Pin"
+  );
+}
+
+function renderPinned() {
+  const panel = document.getElementById("pinned-panel");
+  const pinned = state.tasks.filter((t) => t.pinned);
+  const open = pinned.filter((t) => t.status !== "completed");
+  const doneCount = pinned.length - open.length;
+  panel.hidden = pinned.length === 0;
+  if (pinned.length === 0) {
+    panel.replaceChildren();
+    return;
+  }
+
+  const nodes = [el("h2", { className: "section-title" }, `📌 Pinned quests (${open.length})`)];
+  if (open.length === 0) {
+    nodes.push(el("p", { className: "hint" }, "Everything you pinned is completed."));
+  }
+  for (const task of open) {
+    const objectives = task.objectives.filter((o) => !o.optional).map((o) => el("li", {}, o.description));
+    const card = el(
+      "div",
+      { className: "now-box" },
+      el("h4", {}, task.name, " ", task.status ? el("span", { className: "badge" }, task.status) : ""),
+      el("div", { className: "task-meta" }, `${task.trader}${task.map ? " • " + task.map : ""}`),
+      el("ul", {}, ...objectives)
+    );
+    if (task.wikiLink && isSafeHttpUrl(task.wikiLink)) {
+      card.append(el("a", { href: task.wikiLink, target: "_blank", rel: "noopener" }, "View on wiki"), " ");
+    }
+    card.append(pinButton(task));
+    nodes.push(card);
+  }
+  if (doneCount > 0) {
+    nodes.push(el("p", { className: "hint" }, `${doneCount} pinned quest(s) already completed, so hidden here.`));
+  }
+  panel.replaceChildren(...nodes);
 }
 
 function percentOf(done, total) {
@@ -156,6 +232,7 @@ function taskLine(task) {
   if (task.wikiLink && isSafeHttpUrl(task.wikiLink)) {
     line.append(" ", el("a", { href: task.wikiLink, target: "_blank", rel: "noopener" }, "wiki"));
   }
+  line.append(" ", pinButton(task));
   return line;
 }
 
@@ -199,8 +276,9 @@ function renderFocus() {
       el("ul", {}, ...objectives)
     );
     if (task.wikiLink && isSafeHttpUrl(task.wikiLink)) {
-      card.append(el("a", { href: task.wikiLink, target: "_blank", rel: "noopener" }, "View on wiki"));
+      card.append(el("a", { href: task.wikiLink, target: "_blank", rel: "noopener" }, "View on wiki"), " ");
     }
+    card.append(pinButton(task));
     nodes.push(card);
   }
 
@@ -295,7 +373,9 @@ function renderTasks() {
       link.rel = "noopener";
       link.textContent = "View on wiki";
       card.appendChild(link);
+      card.append(" ");
     }
+    card.append(pinButton(task));
     container.appendChild(card);
   }
 }
