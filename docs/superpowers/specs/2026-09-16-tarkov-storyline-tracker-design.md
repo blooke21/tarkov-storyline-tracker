@@ -1,5 +1,20 @@
 # Tarkov Storyline Tracker — Design
 
+> **Update 2026-10-10 — data source.** This document and the plans were
+> written assuming tarkov.dev's GraphQL API (`api.tarkov.dev/graphql`) as
+> the quest-data source. That API has been returning "GraphQL server
+> unavailable" since about 2026-07-21 (before this project started), so
+> the app now reads tarkov.dev's static JSON feed first
+> (`json.tarkov.dev/{pve,regular}/…`, `src/tarkovData/jsonClient.ts`) and
+> keeps GraphQL only as a fallback. Everything downstream of the
+> `TarkovTask` shape is unchanged. Quest data is per game mode — PvE by
+> default, `TARKOV_GAME_MODE=regular` to switch — and the cache records
+> which mode it holds.
+>
+> **Known gap found the same day:** progress is accumulated from the
+> player's entire log history, which spans wipes, so it overstates the
+> current character's progress (see the project memory / follow-up work).
+
 ## Problem
 
 Escape from Tarkov's quest system is a large dependency graph spanning

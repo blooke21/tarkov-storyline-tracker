@@ -8,8 +8,9 @@ import {
   ProgressStore,
   deriveStorylines,
   loadCache,
+  parseGameMode,
 } from "./index.js";
-import type { TarkovTask, TaskCache } from "./index.js";
+import type { TarkovTask, TaskCache, GameMode } from "./index.js";
 import { createServer } from "./server/createServer.js";
 import { createApiRoutes } from "./server/apiRoutes.js";
 
@@ -21,24 +22,30 @@ export interface AppConfig {
   staticDir?: string;
   fetchImpl?: typeof fetch;
   pollIntervalMs?: number;
+  /** Which game mode's quests to track. Defaults to the TARKOV_GAME_MODE env var, then PvE. */
+  gameMode?: GameMode;
 }
 
 export interface RunningApp {
   server: Server;
   store: ProgressStore;
   tailer: LogTailer;
+  gameMode: GameMode;
 }
 
 const DEFAULT_LOGS_ROOT_DIR = "C:\\Battlestate Games\\Escape from Tarkov\\Logs";
 
 export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
+  // Resolved first so an invalid TARKOV_GAME_MODE fails before any real work
+  // (network, database, log reading) happens.
+  const gameMode = config.gameMode ?? parseGameMode(process.env.TARKOV_GAME_MODE);
   const port = config.port ?? 4173;
   const logsRootDir = config.logsRootDir ?? process.env.TARKOV_LOGS_DIR ?? DEFAULT_LOGS_ROOT_DIR;
   const cachePath = config.cachePath ?? join(process.cwd(), ".tarkov-cache.json");
   const dbPath = config.dbPath ?? join(process.cwd(), ".tarkov-progress.sqlite");
   const staticDir = config.staticDir ?? join(process.cwd(), "public");
 
-  const tasks: TarkovTask[] = await syncTaskGraph(cachePath, { fetchImpl: config.fetchImpl });
+  const tasks: TarkovTask[] = await syncTaskGraph(cachePath, { fetchImpl: config.fetchImpl, gameMode });
 
   const store = new ProgressStore(dbPath);
 
@@ -73,7 +80,7 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
     throw error;
   }
 
-  return { server, store, tailer };
+  return { server, store, tailer, gameMode };
 }
 
 // pathToFileURL (not manual string/URL construction) is the Node-documented
@@ -86,7 +93,8 @@ if (isMainModule) {
     .then((app) => {
       const address = app.server.address();
       const port = typeof address === "object" && address ? address.port : "unknown";
-      console.log(`Tarkov Storyline Tracker running at http://127.0.0.1:${port}`);
+      const modeLabel = app.gameMode === "pve" ? "PvE" : "regular";
+      console.log(`Tarkov Storyline Tracker running at http://127.0.0.1:${port} (${modeLabel} quests)`);
     })
     .catch((error) => {
       console.error("Failed to start:", error);

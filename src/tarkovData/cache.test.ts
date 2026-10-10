@@ -72,6 +72,41 @@ describe("saveCache / loadCache", () => {
     expect(loadCache(cachePath)).toBeNull();
   });
 
+  it("records which game mode the tasks are for, defaulting to pve", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-cache-test-"));
+    const cachePath = join(tempDir, "cache.json");
+
+    saveCache(cachePath, sampleTasks);
+    expect(loadCache(cachePath)?.gameMode).toBe("pve");
+
+    saveCache(cachePath, sampleTasks, new Date(), "regular");
+    expect(loadCache(cachePath)?.gameMode).toBe("regular");
+  });
+
+  it("rejects a cache written in the previous (version 1, no game mode) format so it gets refetched", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-cache-test-"));
+    const cachePath = join(tempDir, "v1.json");
+    writeFileSync(
+      cachePath,
+      JSON.stringify({ version: 1, fetchedAt: new Date().toISOString(), tasks: sampleTasks }),
+      "utf-8"
+    );
+
+    expect(loadCache(cachePath)).toBeNull();
+  });
+
+  it("rejects a cache whose game mode isn't a known one", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-cache-test-"));
+    const cachePath = join(tempDir, "bad-mode.json");
+    writeFileSync(
+      cachePath,
+      JSON.stringify({ version: CACHE_VERSION, gameMode: "arena", fetchedAt: new Date().toISOString(), tasks: sampleTasks }),
+      "utf-8"
+    );
+
+    expect(loadCache(cachePath)).toBeNull();
+  });
+
   it("does not leave a temp file behind after a successful save", () => {
     tempDir = mkdtempSync(join(tmpdir(), "tarkov-cache-test-"));
     const cachePath = join(tempDir, "cache.json");

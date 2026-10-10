@@ -26,7 +26,7 @@ describe("buildStatusResponse", () => {
     store = new ProgressStore(":memory:");
     store.setMeta("lastRaidSeenAt", "2026-01-01T00:00:00.000Z");
     store.setMeta("lastWatcherPollAt", "2026-01-02T00:00:00.000Z");
-    const cache: TaskCache = { version: 1, fetchedAt: "2026-01-03T00:00:00.000Z", tasks: [] };
+    const cache: TaskCache = { version: 2, gameMode: "pve", fetchedAt: "2026-01-03T00:00:00.000Z", tasks: [] };
 
     expect(buildStatusResponse(cache, store)).toEqual({
       taskGraphFetchedAt: "2026-01-03T00:00:00.000Z",

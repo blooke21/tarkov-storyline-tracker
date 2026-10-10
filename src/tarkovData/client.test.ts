@@ -32,6 +32,32 @@ describe("fetchTasks", () => {
     );
   });
 
+  it("asks for the PvE task list by default and the regular one when told to", async () => {
+    const fakeFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { tasks: [sampleTask] } }),
+    });
+
+    await fetchTasks(fakeFetch as unknown as typeof fetch);
+    await fetchTasks(fakeFetch as unknown as typeof fetch, "regular");
+
+    const bodyOf = (call: number): string => (fakeFetch.mock.calls[call][1] as RequestInit).body as string;
+    expect(bodyOf(0)).toContain("gameMode: pve");
+    expect(bodyOf(1)).toContain("gameMode: regular");
+  });
+
+  it("gives up on a request that never answers instead of hanging startup forever", async () => {
+    const fakeFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { tasks: [sampleTask] } }),
+    });
+
+    await fetchTasks(fakeFetch as unknown as typeof fetch);
+
+    const init = fakeFetch.mock.calls[0][1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
   it("throws when the HTTP response is not ok", async () => {
     const fakeFetch = vi.fn().mockResolvedValue({
       ok: false,
