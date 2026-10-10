@@ -101,6 +101,17 @@ describe("ProgressStore wipe boundary", () => {
     expect(store.getProgressSince()).toEqual(new Date("2027-03-01T00:00:00.000Z"));
   });
 
+  it("leaves everything untouched if a wipe fails partway (all or nothing)", () => {
+    store = new ProgressStore(":memory:");
+    store.recordEvent("task-1", "completed", new Date("2026-10-01T00:00:00.000Z"));
+
+    // An invalid date makes the wipe fail after it has already started deleting.
+    expect(() => store!.resetProgress(new Date("not a date"))).toThrow();
+
+    expect(store.getStatus("task-1")).toBe("completed");
+    expect(store.getProgressSince()).toBeNull();
+  });
+
   it("returns null rather than throwing if the stored boundary is corrupt", () => {
     store = new ProgressStore(":memory:");
     store.setMeta("progressSince", "not a date");

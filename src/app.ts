@@ -1,5 +1,5 @@
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Server } from "node:http";
 import {
   syncTaskGraph,
@@ -13,6 +13,7 @@ import {
 import type { TarkovTask, TaskCache, GameMode } from "./index.js";
 import { createServer } from "./server/createServer.js";
 import { createApiRoutes } from "./server/apiRoutes.js";
+import { isTrackerRunning, openBrowser, shouldOpenBrowser } from "./launcher.js";
 
 export interface AppConfig {
   port?: number;
@@ -35,15 +36,21 @@ export interface RunningApp {
 
 const DEFAULT_LOGS_ROOT_DIR = "C:\\Battlestate Games\\Escape from Tarkov\\Logs";
 
+const DEFAULT_PORT = 4173;
+
+// The project folder (one above src/ or dist/), so the app finds its database
+// and web files no matter which folder a desktop shortcut starts it from.
+const PROJECT_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+
 export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
   // Resolved first so an invalid TARKOV_GAME_MODE fails before any real work
   // (network, database, log reading) happens.
   const gameMode = config.gameMode ?? parseGameMode(process.env.TARKOV_GAME_MODE);
-  const port = config.port ?? 4173;
+  const port = config.port ?? DEFAULT_PORT;
   const logsRootDir = config.logsRootDir ?? process.env.TARKOV_LOGS_DIR ?? DEFAULT_LOGS_ROOT_DIR;
-  const cachePath = config.cachePath ?? join(process.cwd(), ".tarkov-cache.json");
-  const dbPath = config.dbPath ?? join(process.cwd(), ".tarkov-progress.sqlite");
-  const staticDir = config.staticDir ?? join(process.cwd(), "public");
+  const cachePath = config.cachePath ?? join(PROJECT_ROOT, ".tarkov-cache.json");
+  const dbPath = config.dbPath ?? join(PROJECT_ROOT, ".tarkov-progress.sqlite");
+  const staticDir = config.staticDir ?? join(PROJECT_ROOT, "public");
 
   const tasks: TarkovTask[] = await syncTaskGraph(cachePath, { fetchImpl: config.fetchImpl, gameMode });
 
@@ -89,16 +96,34 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
 // URL doesn't reliably handle Windows path separators or encoding.
 const isMainModule = Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1] as string).href;
 
+async function main(): Promise<void> {
+  const open = shouldOpenBrowser(process.argv, process.env);
+
+  if (await isTrackerRunning(DEFAULT_PORT)) {
+    const url = `http://127.0.0.1:${DEFAULT_PORT}`;
+    console.log(`Tarkov Storyline Tracker is already running - opening ${url}`);
+    if (open) {
+      openBrowser(url);
+    }
+    return;
+  }
+
+  console.log("Starting Tarkov Storyline Tracker (reading your game logs)...");
+  const app = await startApp();
+  const address = app.server.address();
+  const port = typeof address === "object" && address ? address.port : DEFAULT_PORT;
+  const url = `http://127.0.0.1:${port}`;
+  const modeLabel = app.gameMode === "pve" ? "PvE" : "regular";
+  console.log(`Tarkov Storyline Tracker running at ${url} (${modeLabel} quests)`);
+  console.log("Leave this window open while you use it. Close it to stop the tracker.");
+  if (open) {
+    openBrowser(url);
+  }
+}
+
 if (isMainModule) {
-  startApp()
-    .then((app) => {
-      const address = app.server.address();
-      const port = typeof address === "object" && address ? address.port : "unknown";
-      const modeLabel = app.gameMode === "pve" ? "PvE" : "regular";
-      console.log(`Tarkov Storyline Tracker running at http://127.0.0.1:${port} (${modeLabel} quests)`);
-    })
-    .catch((error) => {
-      console.error("Failed to start:", error);
-      process.exit(1);
-    });
+  main().catch((error) => {
+    console.error("Failed to start:", error);
+    process.exit(1);
+  });
 }
