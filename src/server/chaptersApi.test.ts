@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { ProgressStore } from "../progress/store.js";
-import { buildChaptersResponse, setChapterStatus, setObjectiveDone } from "./chaptersApi.js";
+import { buildChaptersResponse, setChapterPosition, setChapterStatus, setObjectiveDone } from "./chaptersApi.js";
 import type { ChaptersApiDeps } from "./chaptersApi.js";
 import { HttpError } from "./createServer.js";
 import { STORY_CHAPTERS } from "../storyChapters/chapters.js";
@@ -108,6 +108,38 @@ describe("setObjectiveDone", () => {
       setObjectiveDone(deps, "nope", "0", true);
     } catch (error) {
       expect((error as HttpError).status).toBe(404);
+    }
+  });
+});
+
+describe("setChapterPosition", () => {
+  it("ticks everything before the chosen step and makes the chapter active, with that step next", () => {
+    const deps = setUp();
+
+    setChapterPosition(deps, "demo", "3");
+
+    const view = demo(deps);
+    expect(view.objectives.map((o) => o.done)).toEqual([true, true, true, false, false]);
+    expect(view.status).toBe("active");
+    expect(view.currentIndex).toBe(3);
+  });
+
+  it("moving back unticks the later steps", () => {
+    const deps = setUp();
+    setChapterPosition(deps, "demo", "4");
+
+    setChapterPosition(deps, "demo", "0");
+
+    expect(demo(deps).objectives.every((o) => !o.done)).toBe(true);
+    expect(demo(deps).status).toBe("active");
+  });
+
+  it("rejects an unknown chapter and a bad index", () => {
+    const deps = setUp();
+
+    expect(() => setChapterPosition(deps, "nope", "0")).toThrow(HttpError);
+    for (const bad of [null, "x", "-1", "5"]) {
+      expect(() => setChapterPosition(deps, "demo", bad)).toThrow(/index/);
     }
   });
 });

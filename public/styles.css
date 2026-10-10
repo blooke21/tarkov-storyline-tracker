@@ -472,3 +472,14 @@ body.viewing-chapter #browse {
 #chapter-view .reset-actions {
   margin: 0.8rem 0;
 }
+
+.link-button {
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 0 0.3rem;
+  cursor: pointer;
+  text-decoration: underline;
+}

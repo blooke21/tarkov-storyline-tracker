@@ -5,7 +5,7 @@ import type { Storyline } from "../storylines/deriveStorylines.js";
 import type { ProgressStore } from "../progress/store.js";
 import type { TaskCache } from "../tarkovData/cache.js";
 import { buildStatusResponse, buildProgressResponse, buildTasksResponse } from "./apiData.js";
-import { buildChaptersResponse, setChapterStatus, setObjectiveDone } from "./chaptersApi.js";
+import { buildChaptersResponse, setChapterPosition, setChapterStatus, setObjectiveDone } from "./chaptersApi.js";
 import { STORY_CHAPTERS } from "../storyChapters/chapters.js";
 import type { StoryChapter } from "../storyChapters/types.js";
 import { scanLogs } from "./scanApi.js";
@@ -65,6 +65,10 @@ export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
     "POST /api/chapters/status": (url, req) => {
       requireTrackerHeader(req);
       return setChapterStatus(chapterDeps, url.searchParams.get("chapter"), url.searchParams.get("status"));
+    },
+    "POST /api/chapters/position": (url, req) => {
+      requireTrackerHeader(req);
+      return setChapterPosition(chapterDeps, url.searchParams.get("chapter"), url.searchParams.get("index"));
     },
     "POST /api/chapters/objective": (url, req) => {
       requireTrackerHeader(req);

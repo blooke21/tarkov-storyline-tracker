@@ -274,3 +274,23 @@ describe("scan route over HTTP", () => {
     expect(store!.getStatus("sample-1")).toBe("completed");
   });
 });
+
+describe("chapter position route over HTTP", () => {
+  it("needs the tracker header, then ticks everything before the chosen step", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
+    store = new ProgressStore(":memory:");
+    startTestServer();
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+    const url = `${baseUrl()}/api/chapters/position?chapter=tour&index=3`;
+
+    expect((await fetch(url, { method: "POST" })).status).toBe(403);
+
+    const response = await fetch(url, { method: "POST", headers: TRACKER_HEADER });
+    const body = (await response.json()) as { chapters: Array<{ id: string; status: string; objectives: Array<{ done: boolean }> }> };
+    const tour = body.chapters.find((c) => c.id === "tour")!;
+
+    expect(response.status).toBe(200);
+    expect(tour.status).toBe("active");
+    expect(tour.objectives.slice(0, 4).map((o) => o.done)).toEqual([true, true, true, false]);
+  });
+});

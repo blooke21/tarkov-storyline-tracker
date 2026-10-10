@@ -148,3 +148,17 @@ export function setObjectiveDone(
     return { ...current, done: done ? [...remaining, ...group].sort((a, b) => a - b) : remaining };
   });
 }
+
+/** "I'm up to here": ticks everything before the given step and unticks it and everything after. */
+export function setChapterPosition(deps: ChaptersApiDeps, chapterId: string | null, indexParam: string | null): ChaptersResponse {
+  const chapter = findChapter(deps, chapterId);
+  const index = Number(indexParam);
+  if (indexParam === null || !Number.isInteger(index) || index < 0 || index >= chapter.objectives.length) {
+    throw new HttpError(400, `index must be a whole number from 0 to ${chapter.objectives.length - 1}`);
+  }
+  return update(deps, chapter.id, () => ({
+    active: true,
+    finished: false,
+    done: Array.from({ length: index }, (_, i) => i),
+  }));
+}

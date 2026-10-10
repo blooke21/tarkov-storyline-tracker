@@ -69,6 +69,10 @@
     return post(`/api/chapters/objective?chapter=${encodeURIComponent(chapter.id)}&index=${index}&done=${done ? 1 : 0}`);
   }
 
+  function setPosition(chapter, index) {
+    return post(`/api/chapters/position?chapter=${encodeURIComponent(chapter.id)}&index=${index}`);
+  }
+
   function renderGrid() {
     const sorted = [...chapters].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
     const cards = sorted.map((chapter) => {
@@ -110,7 +114,11 @@
       onchange: (event) => setStep(chapter, objective.index, event.target.checked),
     });
     const text = objective.optional ? `${objective.text} (optional)` : objective.text;
-    return el("li", { className: classes.join(" ") }, el("label", {}, checkbox, " ", text));
+    const row = el("li", { className: classes.join(" ") }, el("label", {}, checkbox, " ", text));
+    if (objective.depth === 1 && !objective.done) {
+      row.append(" ", el("button", { type: "button", className: "link-button", onclick: () => setPosition(chapter, objective.index) }, "I'm up to here"));
+    }
+    return row;
   }
 
   function renderNow(chapter) {
@@ -195,7 +203,8 @@
       el(
         "p",
         { className: "hint" },
-        "If a chapter branches (The Ticket and Boreas do), tick off or skip the steps for the path you didn't take."
+        "Already further along? Click \"I'm up to here\" on the step you're on and everything before it is ticked off. " +
+          "If a chapter branches (The Ticket and Boreas do), tick off or skip the steps for the path you didn't take."
       ),
       el("ul", { className: "step-list" }, ...chapter.objectives.map((o) => stepRow(chapter, o))),
       el("p", { className: "hint" }, "Steps are copied from the Escape from Tarkov wiki (CC BY-SA); the wiki page is the source of truth if the game changes.")
