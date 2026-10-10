@@ -1,9 +1,10 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { ProgressStore } from "../progress/store.js";
-import { buildChaptersResponse, setChapterPosition, setChapterStatus, setObjectiveDone } from "./chaptersApi.js";
+import { buildChaptersResponse, buildGuideResponse, setChapterPosition, setChapterStatus, setObjectiveDone } from "./chaptersApi.js";
 import type { ChaptersApiDeps } from "./chaptersApi.js";
 import { HttpError } from "./createServer.js";
 import { STORY_CHAPTERS } from "../storyChapters/chapters.js";
+import { CHAPTER_GUIDES } from "../storyChapters/guides.js";
 import type { StoryChapter } from "../storyChapters/types.js";
 
 const chapters: StoryChapter[] = [
@@ -209,5 +210,74 @@ describe("the built-in chapters", () => {
       expect(chapter.objectives.some((o) => o.depth === 1 && !o.optional)).toBe(true);
       expect(chapter.objectives.every((o) => o.text.length > 0 && !/\[\[|\]\]|''|<|File:/.test(o.text))).toBe(true);
     }
+  });
+});
+
+describe("buildGuideResponse", () => {
+  it("returns the walkthrough sections for a chapter", () => {
+    const deps = { ...setUp(), guides: { demo: [{ title: "Do the thing", blocks: [{ kind: "text" as const, text: "Go there." }] }] } };
+
+    expect(buildGuideResponse(deps, "demo").sections).toEqual([{ title: "Do the thing", blocks: [{ kind: "text", text: "Go there." }] }]);
+  });
+
+  it("returns an empty walkthrough for a chapter the wiki has none for, and 404 for an unknown chapter", () => {
+    const deps = { ...setUp(), guides: {} };
+
+    expect(buildGuideResponse(deps, "other").sections).toEqual([]);
+    expect(() => buildGuideResponse(deps, "nope")).toThrow(HttpError);
+  });
+});
+
+describe("the built-in walkthroughs", () => {
+  it("every step's guide index points at a real section of its chapter", () => {
+    for (const chapter of STORY_CHAPTERS) {
+      const sections = CHAPTER_GUIDES[chapter.id] ?? [];
+      for (const objective of chapter.objectives) {
+        if (objective.guide !== undefined) {
+          expect(objective.guide).toBeGreaterThanOrEqual(0);
+          expect(objective.guide).toBeLessThan(sections.length);
+        }
+      }
+    }
+  });
+
+  it("sections have a title and content, screenshots are https links, and nothing contains leftover wiki markup", () => {
+    for (const sections of Object.values(CHAPTER_GUIDES)) {
+      for (const section of sections) {
+        expect(section.title.length).toBeGreaterThan(0);
+        expect(section.blocks.length).toBeGreaterThan(0);
+        for (const block of section.blocks) {
+          const texts =
+            block.kind === "text" || block.kind === "heading"
+              ? [block.text]
+              : block.kind === "list"
+                ? block.items
+                : block.kind === "items"
+                  ? block.items.flatMap((item) => [item.name, item.amount, item.note])
+                  : block.images.map((image) => image.caption);
+          for (const text of texts) {
+            expect(text).not.toMatch(/\[\[|\]\]|\{\{|''|<[a-z/]|File:/i);
+          }
+          if (block.kind === "images") {
+            for (const image of block.images) {
+              expect(image.url).toMatch(/^https:\/\//);
+              expect(image.full).toMatch(/^https:\/\//);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("Tour's Reserve and Lighthouse steps lead to the wiki's walkthrough for those parts", () => {
+    const tour = STORY_CHAPTERS.find((c) => c.id === "tour")!;
+    const titleFor = (text: string) => {
+      const step = tour.objectives.find((o) => o.text === text)!;
+      return CHAPTER_GUIDES.tour[step.guide!].title;
+    };
+
+    expect(titleFor("Ensure access to Reserve")).toMatch(/Reserve/);
+    expect(titleFor("Ensure access to Lighthouse")).toMatch(/Lighthouse/);
+    expect(titleFor("Talk to Ragman")).toMatch(/Ragman/);
   });
 });

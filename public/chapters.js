@@ -16,6 +16,11 @@
 
   let chapters = [];
   let shownId = null;
+  // Walkthrough text per chapter id, fetched when a chapter is opened (it's large).
+  const guides = {};
+  const guideRequested = new Set();
+  // Steps whose "How?" walkthrough the player opened, as "chapterId:stepIndex".
+  const openSteps = new Set();
 
   function el(tag, props, ...children) {
     const node = document.createElement(tag);
@@ -69,6 +74,99 @@
     return post(`/api/chapters/objective?chapter=${encodeURIComponent(chapter.id)}&index=${index}&done=${done ? 1 : 0}`);
   }
 
+  function isHttps(value) {
+    return typeof value === "string" && value.startsWith("https://");
+  }
+
+  function renderBlock(block) {
+    if (block.kind === "text") {
+      return el("p", {}, block.text);
+    }
+    if (block.kind === "heading") {
+      return el("h5", {}, block.text);
+    }
+    if (block.kind === "list") {
+      return el("ul", {}, ...block.items.map((item) => el("li", {}, item)));
+    }
+    if (block.kind === "items") {
+      return el(
+        "div",
+        { className: "guide-items" },
+        el("strong", {}, "You'll need:"),
+        el(
+          "ul",
+          {},
+          ...block.items.map((item) =>
+            el("li", {}, `${item.name}${item.amount ? " ×" + item.amount : ""}${item.note ? " — " + item.note : ""}`)
+          )
+        )
+      );
+    }
+    if (block.kind === "images") {
+      const figures = block.images
+        .filter((image) => isHttps(image.url) && isHttps(image.full))
+        .map((image) => {
+          const picture = el("img", { src: image.url, alt: image.caption || "Screenshot from the wiki", loading: "lazy", referrerPolicy: "no-referrer" });
+          const figure = el(
+            "figure",
+            {},
+            el("a", { href: image.full, target: "_blank", rel: "noopener", title: "Open the full-size screenshot" }, picture),
+            image.caption ? el("figcaption", {}, image.caption) : ""
+          );
+          picture.addEventListener("error", () => figure.remove());
+          return figure;
+        });
+      return figures.length ? el("div", { className: "guide-images" }, ...figures) : null;
+    }
+    return null;
+  }
+
+  function hasGuide(chapter, index) {
+    const sections = guides[chapter.id];
+    return index !== undefined && Boolean(sections && sections[index]);
+  }
+
+  // The wiki's walkthrough for a step: what to do, what you need, and screenshots.
+  function guideNode(chapter, index, open) {
+    const sections = guides[chapter.id];
+    if (index === undefined || !sections || !sections[index]) {
+      return null;
+    }
+    const section = sections[index];
+    const blocks = section.blocks.map(renderBlock).filter(Boolean);
+    return el(
+      "details",
+      { className: "guide", open },
+      el("summary", {}, `How to do this — wiki walkthrough: ${section.title}`),
+      ...blocks,
+      el(
+        "p",
+        { className: "hint" },
+        "Text and screenshots from the ",
+        el("a", { href: chapter.wikiUrl, target: "_blank", rel: "noopener" }, "Escape from Tarkov wiki"),
+        " (CC BY-SA)."
+      )
+    );
+  }
+
+  async function loadGuide(chapter) {
+    if (guides[chapter.id] || guideRequested.has(chapter.id)) {
+      return;
+    }
+    guideRequested.add(chapter.id);
+    try {
+      const response = await fetch(`/api/chapters/guide?chapter=${encodeURIComponent(chapter.id)}`);
+      if (!response.ok) {
+        throw new Error(`${response.status}`);
+      }
+      guides[chapter.id] = (await response.json()).sections;
+      render();
+    } catch (error) {
+      guideRequested.delete(chapter.id);
+      console.error("Could not load the walkthrough:", error);
+    }
+  }
+
   function setPosition(chapter, index) {
     return post(`/api/chapters/position?chapter=${encodeURIComponent(chapter.id)}&index=${index}`);
   }
@@ -118,6 +216,29 @@
     if (objective.depth === 1 && !objective.done) {
       row.append(" ", el("button", { type: "button", className: "link-button", onclick: () => setPosition(chapter, objective.index) }, "I'm up to here"));
     }
+    const key = `${chapter.id}:${objective.index}`;
+    if (objective.depth === 1 && hasGuide(chapter, objective.guide)) {
+      const shown = openSteps.has(key);
+      row.append(
+        " ",
+        el(
+          "button",
+          {
+            type: "button",
+            className: "link-button",
+            onclick: () => {
+              if (shown) openSteps.delete(key);
+              else openSteps.add(key);
+              render();
+            },
+          },
+          shown ? "Hide how" : "How?"
+        )
+      );
+      if (shown) {
+        row.append(guideNode(chapter, objective.guide, true));
+      }
+    }
     return row;
   }
 
@@ -159,6 +280,12 @@
       );
     }
     box.append(button("Done ✓ — next step", "primary", () => setStep(chapter, current.index, true)));
+    const walkthrough = guideNode(chapter, current.guide, true);
+    if (walkthrough) {
+      box.append(walkthrough);
+    } else if (current.guide !== undefined) {
+      box.append(el("p", { className: "hint" }, "Loading the walkthrough…"));
+    }
     if (upcoming.length > 0) {
       box.append(el("p", { className: "hint" }, "Then: " + upcoming.map((o) => o.text).join(" → ")));
     }
@@ -218,6 +345,7 @@
     view.hidden = !chapter;
     if (chapter) {
       renderView(chapter);
+      loadGuide(chapter);
       if (shownId !== chapter.id) {
         window.scrollTo({ top: 0 });
       }

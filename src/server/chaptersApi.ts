@@ -1,7 +1,8 @@
 import { HttpError } from "./createServer.js";
 import type { ProgressStore } from "../progress/store.js";
-import type { ChapterObjective, StoryChapter } from "../storyChapters/types.js";
+import type { ChapterObjective, GuideSection, StoryChapter } from "../storyChapters/types.js";
 import { STORY_CHAPTERS_META_KEY } from "../progress/store.js";
+import { CHAPTER_GUIDES } from "../storyChapters/guides.js";
 
 export type ChapterStatus = "not-started" | "active" | "done";
 
@@ -40,6 +41,12 @@ export interface ChaptersResponse {
 export interface ChaptersApiDeps {
   store: ProgressStore;
   chapters: StoryChapter[];
+  /** Walkthrough text per chapter id; defaults to the built-in guides. */
+  guides?: Record<string, GuideSection[]>;
+}
+
+export interface GuideResponse {
+  sections: GuideSection[];
 }
 
 const STATUSES: ChapterStatus[] = ["not-started", "active", "done"];
@@ -93,6 +100,12 @@ function viewOf(chapter: StoryChapter, saved: SavedChapter | undefined): Chapter
     totalSteps: requiredSteps.length,
     currentIndex: next ? next.index : null,
   };
+}
+
+/** The walkthrough for one chapter (it's large, so it's fetched when a chapter is opened, not with the list). */
+export function buildGuideResponse(deps: ChaptersApiDeps, chapterId: string | null): GuideResponse {
+  const chapter = findChapter(deps, chapterId);
+  return { sections: (deps.guides ?? CHAPTER_GUIDES)[chapter.id] ?? [] };
 }
 
 export function buildChaptersResponse(deps: ChaptersApiDeps): ChaptersResponse {
