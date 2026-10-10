@@ -11,6 +11,8 @@ interface MetaRow {
   value: string;
 }
 
+const PROGRESS_SINCE_KEY = "progressSince";
+
 export class ProgressStore {
   private db: Database.Database;
 
@@ -68,6 +70,31 @@ export class ProgressStore {
   getMeta(key: string): string | null {
     const row = this.db.prepare(`SELECT value FROM store_meta WHERE key = ?`).get(key) as MetaRow | undefined;
     return row ? row.value : null;
+  }
+
+  /**
+   * Starts tracking from scratch, e.g. after the player resets their
+   * character. Forgets every recorded task and remembers `since`: from then
+   * on, log events older than that moment are ignored. The boundary is what
+   * makes the wipe stick — without it, the next restart would re-read the old
+   * logs and bring the previous character's progress straight back.
+   */
+  resetProgress(since: Date): void {
+    const wipe = this.db.transaction(() => {
+      this.db.prepare(`DELETE FROM task_progress`).run();
+      this.setMeta(PROGRESS_SINCE_KEY, since.toISOString());
+    });
+    wipe();
+  }
+
+  /** The moment tracking was last reset to, or null if it never has been. */
+  getProgressSince(): Date | null {
+    const value = this.getMeta(PROGRESS_SINCE_KEY);
+    if (!value) {
+      return null;
+    }
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
   }
 
   close(): void {

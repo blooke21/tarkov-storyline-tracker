@@ -19,6 +19,7 @@ describe("buildStatusResponse", () => {
       taskGraphFetchedAt: null,
       lastRaidSeenAt: null,
       lastWatcherPollAt: null,
+      progressSince: null,
     });
   });
 
@@ -32,7 +33,15 @@ describe("buildStatusResponse", () => {
       taskGraphFetchedAt: "2026-01-03T00:00:00.000Z",
       lastRaidSeenAt: "2026-01-01T00:00:00.000Z",
       lastWatcherPollAt: "2026-01-02T00:00:00.000Z",
+      progressSince: null,
     });
+  });
+
+  it("reports when tracking was last reset to", () => {
+    store = new ProgressStore(":memory:");
+    store.resetProgress(new Date("2026-10-10T15:12:00.000Z"));
+
+    expect(buildStatusResponse(null, store).progressSince).toBe("2026-10-10T15:12:00.000Z");
   });
 });
 

@@ -2,7 +2,23 @@ import { createServer as createHttpServer, type IncomingMessage, type Server, ty
 import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 
-export type ApiHandler = (url: URL) => Promise<unknown> | unknown;
+/**
+ * A route handler. It gets the parsed URL and the raw request (so a
+ * state-changing route can check headers); handlers that don't need the
+ * request can simply ignore the second argument.
+ */
+export type ApiHandler = (url: URL, req: IncomingMessage) => Promise<unknown> | unknown;
+
+/** Throw from a handler to answer with a specific HTTP status and message. */
+export class HttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = "HttpError";
+  }
+}
 
 export interface ServerOptions {
   apiRoutes: Record<string, ApiHandler>;
@@ -51,7 +67,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, options:
 
   if (handler) {
     try {
-      const body = await handler(url);
+      const body = await handler(url, req);
       res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
       res.end(JSON.stringify(body));
     } catch (error) {

@@ -64,6 +64,9 @@ function renderStatus(status) {
   if (status.taskGraphFetchedAt) {
     parts.push(`Quest data updated: ${new Date(status.taskGraphFetchedAt).toLocaleDateString()}`);
   }
+  if (status.progressSince) {
+    parts.push(`Counting progress since: ${new Date(status.progressSince).toLocaleString()}`);
+  }
   line.textContent = parts.join(" • ");
 }
 

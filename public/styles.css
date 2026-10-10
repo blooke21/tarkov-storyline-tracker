@@ -139,3 +139,132 @@ main {
   background: var(--accent);
   color: #0f1115;
 }
+
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  background: var(--card-bg);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.notice p {
+  margin: 0;
+  flex: 1 1 22rem;
+  color: var(--muted);
+}
+
+.notice strong {
+  color: var(--text);
+}
+
+.button {
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.button.primary {
+  background: var(--accent);
+  color: #0f1115;
+  border-color: var(--accent);
+}
+
+.button.danger {
+  background: #b4443a;
+  border-color: #b4443a;
+  color: #fff;
+}
+
+.reset-panel {
+  background: var(--card-bg);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.reset-panel[hidden] {
+  display: none;
+}
+
+.reset-panel h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.reset-panel p {
+  margin: 0.4rem 0;
+  font-size: 0.9rem;
+}
+
+.reset-panel .note,
+.reset-panel .hint {
+  color: var(--muted);
+}
+
+.reset-panel .error {
+  color: #e8847a;
+}
+
+.reset-panel ul {
+  margin: 0.4rem 0;
+  padding-left: 1.2rem;
+  font-size: 0.9rem;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.reset-options {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.6rem 0;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.reset-options label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.9rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.reset-options label:hover {
+  background: var(--border);
+}
+
+.reset-options .tag {
+  color: var(--accent);
+  font-size: 0.75rem;
+}
+
+.reset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}

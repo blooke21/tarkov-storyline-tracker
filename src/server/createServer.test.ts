@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { connect } from "node:net";
 import type { Server } from "node:http";
-import { createServer } from "./createServer.js";
+import { createServer, HttpError } from "./createServer.js";
 
 let server: Server | undefined;
 let tempDir: string | undefined;
@@ -123,6 +123,41 @@ describe("createServer", () => {
 
     expect(response.status).toBe(400);
     expect(body.error).toBe("nope");
+  });
+
+  it("routes by HTTP method and hands the handler the request, so it can check headers", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
+    server = createServer({
+      apiRoutes: {
+        "POST /api/echo": (_url, req) => ({ method: req.method, header: req.headers["x-requested-with"] ?? null }),
+      },
+      staticDir: tempDir,
+    });
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+
+    const response = await fetch(`${baseUrl()}/api/echo`, { method: "POST", headers: { "X-Requested-With": "tester" } });
+
+    expect(await response.json()).toEqual({ method: "POST", header: "tester" });
+    // The same path with a different method is not that route.
+    expect((await fetch(`${baseUrl()}/api/echo`)).status).toBe(404);
+  });
+
+  it("uses the status carried by an HttpError and keeps its message", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
+    server = createServer({
+      apiRoutes: {
+        "GET /api/forbidden": () => {
+          throw new HttpError(403, "not allowed");
+        },
+      },
+      staticDir: tempDir,
+    });
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+
+    const response = await fetch(`${baseUrl()}/api/forbidden`);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "not allowed" });
   });
 
   it("defaults to a 500 status when a thrown error has no status", async () => {

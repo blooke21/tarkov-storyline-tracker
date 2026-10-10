@@ -7,6 +7,8 @@ export interface StatusResponse {
   taskGraphFetchedAt: string | null;
   lastRaidSeenAt: string | null;
   lastWatcherPollAt: string | null;
+  /** Set when the player has reset their tracked progress; events before it are ignored. */
+  progressSince: string | null;
 }
 
 export function buildStatusResponse(cache: TaskCache | null, store: ProgressStore): StatusResponse {
@@ -14,6 +16,7 @@ export function buildStatusResponse(cache: TaskCache | null, store: ProgressStor
     taskGraphFetchedAt: cache?.fetchedAt ?? null,
     lastRaidSeenAt: store.getMeta("lastRaidSeenAt"),
     lastWatcherPollAt: store.getMeta("lastWatcherPollAt"),
+    progressSince: store.getProgressSince()?.toISOString() ?? null,
   };
 }
 

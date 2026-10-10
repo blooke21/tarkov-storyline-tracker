@@ -156,3 +156,72 @@ describe("applySessionToStore", () => {
     expect(() => applySessionToStore(sessionDir, store!)).not.toThrow();
   });
 });
+
+describe("applySessionToStore with a wipe boundary", () => {
+  // Two real-format events in one session: an old one (Nov 2023) and a newer one (Jan 2027).
+  const OLD_ID = "aaaaaaaaaaaaaaaaaaaaaaaa";
+  const NEW_ID = "bbbbbbbbbbbbbbbbbbbbbbbb";
+  const notifications = [
+    "2026-09-16 13:20:00.000|1.1.5.0.47426|Info|push-notifications|Got notification | ChatMessageReceived",
+    "{",
+    `  "message": { "type": 12, "dt": 1700000000, "templateId": "${OLD_ID} successMessageText" }`,
+    "}",
+    "2026-09-16 13:21:00.000|1.1.5.0.47426|Info|push-notifications|Got notification | ChatMessageReceived",
+    "{",
+    `  "message": { "type": 10, "dt": 1800000000, "templateId": "${NEW_ID} description" }`,
+    "}",
+  ].join("\n");
+  const BOUNDARY = new Date(1750000000 * 1000);
+
+  function sessionWithBothEvents(): string {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-apply-session-test-"));
+    const sessionDir = join(tempDir, "log_2026.09.16_13-19-26_1.1.5.0.47426");
+    writeSession(sessionDir, notifications, "");
+    return sessionDir;
+  }
+
+  it("ignores task events from before the boundary and applies the ones after it", () => {
+    const sessionDir = sessionWithBothEvents();
+    store = new ProgressStore(":memory:");
+    store.resetProgress(BOUNDARY);
+
+    const result = applySessionToStore(sessionDir, store);
+
+    expect(result.taskEventsApplied).toBe(1);
+    expect(store.getStatus(OLD_ID)).toBeNull();
+    expect(store.getStatus(NEW_ID)).toBe("accepted");
+  });
+
+  it("applies an event that happened exactly at the boundary", () => {
+    const sessionDir = sessionWithBothEvents();
+    store = new ProgressStore(":memory:");
+    store.resetProgress(new Date(1800000000 * 1000));
+
+    applySessionToStore(sessionDir, store);
+
+    expect(store.getStatus(NEW_ID)).toBe("accepted");
+  });
+
+  it("does not bring old progress back when the same logs are re-read after a wipe", () => {
+    const sessionDir = sessionWithBothEvents();
+    store = new ProgressStore(":memory:");
+    applySessionToStore(sessionDir, store);
+    expect(store.getStatus(OLD_ID)).toBe("completed");
+
+    store.resetProgress(BOUNDARY);
+    applySessionToStore(sessionDir, store);
+    applySessionToStore(sessionDir, store);
+
+    expect(store.getStatus(OLD_ID)).toBeNull();
+    expect(store.getStatus(NEW_ID)).toBe("accepted");
+  });
+
+  it("applies everything when no boundary has been set", () => {
+    const sessionDir = sessionWithBothEvents();
+    store = new ProgressStore(":memory:");
+
+    const result = applySessionToStore(sessionDir, store);
+
+    expect(result.taskEventsApplied).toBe(2);
+  });
+});

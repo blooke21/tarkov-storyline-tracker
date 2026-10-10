@@ -16,6 +16,17 @@
 
     <section id="storylines" aria-label="Storyline progress"></section>
 
+    <section id="reset-help" class="notice" aria-label="Help if the numbers look wrong">
+      <p>
+        <strong>Numbers look wrong?</strong>
+        Too many quests showing as done, or quests you just finished not showing as completed?
+        That usually means you reset your character and the tracker is still counting your old one.
+      </p>
+      <button id="open-reset" type="button" class="button">Check &amp; reset my progress</button>
+    </section>
+
+    <section id="reset-panel" class="reset-panel" aria-label="Reset progress" hidden></section>
+
     <section aria-label="Filters" class="filters">
       <label>
         Storyline
@@ -39,5 +50,6 @@
   </main>
 
   <script src="/app.js"></script>
+  <script src="/reset.js"></script>
 </body>
 </html>

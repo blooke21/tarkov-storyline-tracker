@@ -64,3 +64,47 @@ describe("ProgressStore metadata", () => {
     expect(store.getMeta("lastRaidSeenAt")).toBe("2026-09-17T09:00:00.000Z");
   });
 });
+
+describe("ProgressStore wipe boundary", () => {
+  it("has no boundary until one is set", () => {
+    store = new ProgressStore(":memory:");
+    expect(store.getProgressSince()).toBeNull();
+  });
+
+  it("resetProgress clears every recorded task and remembers the boundary", () => {
+    store = new ProgressStore(":memory:");
+    store.recordEvent("task-1", "completed", new Date("2026-10-01T00:00:00.000Z"));
+    store.recordEvent("task-2", "accepted", new Date("2026-10-02T00:00:00.000Z"));
+    const since = new Date("2026-10-10T15:12:00.000Z");
+
+    store.resetProgress(since);
+
+    expect(store.getAllStatuses().size).toBe(0);
+    expect(store.getProgressSince()).toEqual(since);
+  });
+
+  it("leaves unrelated metadata alone", () => {
+    store = new ProgressStore(":memory:");
+    store.setMeta("lastRaidSeenAt", "2026-10-08T03:13:17.034Z");
+
+    store.resetProgress(new Date("2026-10-10T15:12:00.000Z"));
+
+    expect(store.getMeta("lastRaidSeenAt")).toBe("2026-10-08T03:13:17.034Z");
+  });
+
+  it("moves the boundary on a second wipe", () => {
+    store = new ProgressStore(":memory:");
+    store.resetProgress(new Date("2026-10-10T15:12:00.000Z"));
+
+    store.resetProgress(new Date("2027-03-01T00:00:00.000Z"));
+
+    expect(store.getProgressSince()).toEqual(new Date("2027-03-01T00:00:00.000Z"));
+  });
+
+  it("returns null rather than throwing if the stored boundary is corrupt", () => {
+    store = new ProgressStore(":memory:");
+    store.setMeta("progressSince", "not a date");
+
+    expect(store.getProgressSince()).toBeNull();
+  });
+});

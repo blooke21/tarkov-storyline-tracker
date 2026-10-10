@@ -61,6 +61,7 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
     getCache,
     getTasks: () => tasks,
     getStorylines,
+    logsRootDir,
   });
 
   const server = createServer({ apiRoutes: routes, staticDir });
