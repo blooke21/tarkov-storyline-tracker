@@ -244,3 +244,33 @@ describe("story chapter routes over HTTP", () => {
     expect(badStatus.status).toBe(400);
   });
 });
+
+describe("scan route over HTTP", () => {
+  async function boot(): Promise<void> {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
+    store = new ProgressStore(":memory:");
+    writeLogWithEvent(1760000000, 12);
+    startTestServer();
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+  }
+
+  it("refuses POST /api/scan without the tracker header", async () => {
+    await boot();
+
+    const response = await fetch(`${baseUrl()}/api/scan`, { method: "POST" });
+
+    expect(response.status).toBe(403);
+    expect(store!.getStatus("sample-1")).toBeNull();
+  });
+
+  it("scans the logs, brings the tracker up to date and reports what it did", async () => {
+    await boot();
+
+    const response = await fetch(`${baseUrl()}/api/scan`, { method: "POST", headers: TRACKER_HEADER });
+    const body = (await response.json()) as { eventsInLogs: number; added: number; tracked: { completed: number } };
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ eventsInLogs: 1, added: 1, tracked: { completed: 1 } });
+    expect(store!.getStatus("sample-1")).toBe("completed");
+  });
+});

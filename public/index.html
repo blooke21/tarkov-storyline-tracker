@@ -27,8 +27,12 @@
           <strong>Numbers look wrong?</strong>
           Too many quests showing as done, or quests you just finished not showing as completed?
           That usually means you reset your character and the tracker is still counting your old one.
+          &ldquo;Scan my logs&rdquo; re-reads every game log and fills in anything the tracker missed.
         </p>
-        <button id="open-reset" type="button" class="button">Check &amp; reset my progress</button>
+        <div class="reset-actions">
+          <button id="open-scan" type="button" class="button">Scan my logs</button>
+          <button id="open-reset" type="button" class="button">Check &amp; reset my progress</button>
+        </div>
       </section>
 
       <section id="reset-panel" class="reset-panel" aria-label="Reset progress" hidden></section>

@@ -8,6 +8,7 @@ import { buildStatusResponse, buildProgressResponse, buildTasksResponse } from "
 import { buildChaptersResponse, setChapterStatus, setObjectiveDone } from "./chaptersApi.js";
 import { STORY_CHAPTERS } from "../storyChapters/chapters.js";
 import type { StoryChapter } from "../storyChapters/types.js";
+import { scanLogs } from "./scanApi.js";
 import { buildWipeOptions, buildWipePreview, performWipe, parseSince } from "./wipeApi.js";
 
 export interface ApiDeps {
@@ -53,6 +54,11 @@ export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
     "POST /api/wipe": (url, req) => {
       requireTrackerHeader(req);
       return performWipe(wipeDeps, parseSince(url.searchParams.get("since")));
+    },
+
+    "POST /api/scan": (_url, req) => {
+      requireTrackerHeader(req);
+      return scanLogs(wipeDeps);
     },
 
     "GET /api/chapters": () => buildChaptersResponse(chapterDeps),

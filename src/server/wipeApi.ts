@@ -1,7 +1,8 @@
 import { HttpError } from "./createServer.js";
 import { collectTaskEvents } from "../logWatcher/collectEvents.js";
 import type { TaskLogEvent } from "../logWatcher/collectEvents.js";
-import { runBackfill } from "../logWatcher/backfill.js";
+import { scanLogs, countStatuses } from "./scanApi.js";
+import type { ScanReport, StatusCounts } from "./scanApi.js";
 import type { ProgressStore, TaskStatus } from "../progress/store.js";
 import type { TarkovTask } from "../tarkovData/types.js";
 
@@ -9,12 +10,6 @@ export interface WipeApiDeps {
   store: ProgressStore;
   logsRootDir: string;
   getTasks: () => TarkovTask[];
-}
-
-export interface StatusCounts {
-  completed: number;
-  accepted: number;
-  failed: number;
 }
 
 export interface EventSummary {
@@ -45,6 +40,8 @@ export interface WipePreviewResponse {
 export interface WipeResultResponse {
   since: string;
   picked: number;
+  /** The full log scan that runs right after the wipe, so the player can see nothing was missed. */
+  scan: ScanReport;
 }
 
 const UNLISTED_QUEST_NAME = "Quest not in the quest list (e.g. an operational task)";
@@ -55,14 +52,6 @@ const MAX_PREVIEW_QUESTS = 100;
 // A few seconds of slack so a moment the player picked "just now" isn't
 // rejected over a small clock difference.
 const FUTURE_TOLERANCE_MS = 60_000;
-
-function countStatuses(statuses: Map<string, TaskStatus>): StatusCounts {
-  const counts: StatusCounts = { completed: 0, accepted: 0, failed: 0 };
-  for (const status of statuses.values()) {
-    counts[status]++;
-  }
-  return counts;
-}
 
 function nameLookup(tasks: TarkovTask[]): (taskId: string) => string {
   const names = new Map(tasks.map((task) => [task.id, task.name]));
@@ -123,11 +112,11 @@ export function buildWipePreview(deps: WipeApiDeps, since: Date): WipePreviewRes
   };
 }
 
-/** Clears the tracked progress, remembers `since`, and re-reads the logs so everything after it is kept. */
+/** Clears the tracked progress, remembers `since`, then scans every log so everything after it is counted. */
 export function performWipe(deps: WipeApiDeps, since: Date): WipeResultResponse {
   deps.store.resetProgress(since);
-  const result = runBackfill(deps.logsRootDir, deps.store);
-  return { since: since.toISOString(), picked: result.taskEventsApplied };
+  const scan = scanLogs(deps);
+  return { since: since.toISOString(), picked: scan.eventsCounted, scan };
 }
 
 /** Validates the `since` a request supplies. Anything unusable is the caller's mistake, hence 400. */

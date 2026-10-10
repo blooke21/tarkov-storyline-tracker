@@ -164,7 +164,9 @@ describe("performWipe", () => {
 
     const result = performWipe(deps, new Date(T_NEW * 1000));
 
-    expect(result).toEqual({ since: new Date(T_NEW * 1000).toISOString(), picked: 2 });
+    expect(result).toMatchObject({ since: new Date(T_NEW * 1000).toISOString(), picked: 2 });
+    // The wipe finishes with a full scan of the logs, so the player can see what was counted.
+    expect(result.scan).toMatchObject({ eventsInLogs: 5, eventsCounted: 2, tracked: { completed: 0, accepted: 2, failed: 0 } });
     expect(deps.store.getStatus(FIRST_IN_LINE)).toBe("accepted");
     expect(deps.store.getStatus(OPERATIONAL)).toBeNull();
     expect(deps.store.getProgressSince()).toEqual(new Date(T_NEW * 1000));

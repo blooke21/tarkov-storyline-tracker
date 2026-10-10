@@ -14,6 +14,7 @@
 
   const panel = document.getElementById("reset-panel");
   const openButton = document.getElementById("open-reset");
+  const scanButton = document.getElementById("open-scan");
   if (!panel || !openButton) {
     return;
   }
@@ -210,7 +211,99 @@
       show(
         el("h3", {}, "Done — starting fresh"),
         el("p", {}, `Tracking now starts from ${when(result.since)}.`),
-        el("p", {}, `Picked up ${result.picked} quest event(s) from your game log since then.`),
+        ...scanSummary(result.scan),
+        el("div", { className: "reset-actions" }, button("Close", "primary", close))
+      );
+      if (typeof loadData === "function") {
+        loadData();
+      }
+    } catch (error) {
+      showError(error.message);
+    }
+  }
+
+  // What a log scan found, as page elements. Used after a wipe and by "Scan my logs".
+  function scanSummary(scan) {
+    const nodes = [
+      el(
+        "p",
+        {},
+        `Scanned ${scan.logFolders} game log folder(s) (${scan.foldersWithQuestLog} had quest logs): ` +
+          `${scan.eventsInLogs} quest event(s) in total` +
+          (scan.progressSince ? `, ${scan.eventsCounted} of them since your reset.` : ".")
+      ),
+      el(
+        "p",
+        {},
+        `The tracker now has ${scan.tracked.completed} completed, ${scan.tracked.accepted} accepted` +
+          (scan.tracked.failed ? `, ${scan.tracked.failed} failed.` : ".")
+      ),
+    ];
+
+    if (scan.added + scan.changed === 0) {
+      nodes.push(el("p", {}, "✓ Everything in your logs was already in the tracker — nothing was missing."));
+    } else {
+      nodes.push(
+        el("p", {}, `Fixed ${scan.added + scan.changed} quest(s): ${scan.added} added, ${scan.changed} updated.`),
+        el(
+          "ul",
+          {},
+          ...scan.changes.map((change) => el("li", {}, `${change.name} — ${change.from ? change.from + " → " : ""}${change.to}`))
+        )
+      );
+      if (scan.added + scan.changed > scan.changes.length) {
+        nodes.push(el("p", { className: "hint" }, `…and ${scan.added + scan.changed - scan.changes.length} more.`));
+      }
+    }
+
+    if (scan.keptFromEarlier > 0) {
+      nodes.push(
+        el(
+          "p",
+          { className: "hint" },
+          `${scan.keptFromEarlier} quest(s) the tracker remembers aren't in your current logs (the game deletes old logs). They were kept.`
+        )
+      );
+    }
+    if (scan.notInQuestList > 0) {
+      nodes.push(
+        el(
+          "p",
+          { className: "hint" },
+          `${scan.notInQuestList} quest(s) in your logs aren't in the quest list (operational tasks and the like), so they're counted but not shown.`
+        )
+      );
+    }
+    if (scan.missingEarlierTotal > 0) {
+      nodes.push(
+        el(
+          "p",
+          {},
+          `Worth a look: ${scan.missingEarlierTotal} quest(s) you've started need an earlier quest that your logs don't show you completing. ` +
+            "If you did finish them, the logs may be incomplete:"
+        ),
+        el("ul", {}, ...scan.missingEarlier.map((item) => el("li", {}, `${item.name} (needed for ${item.neededBy})`)))
+      );
+    }
+    if (scan.lastEventAt) {
+      nodes.push(
+        el(
+          "p",
+          { className: "note" },
+          `Newest quest event in your logs: ${when(scan.lastEventAt)}. A finished quest only shows up once you hand it in to the trader.`
+        )
+      );
+    }
+    return nodes;
+  }
+
+  async function scan() {
+    show(el("p", { className: "hint" }, "Reading every game log…"));
+    try {
+      const report = await request("/api/scan", { method: "POST", headers: WRITE_HEADERS });
+      show(
+        el("h3", {}, "Log scan complete"),
+        ...scanSummary(report),
         el("div", { className: "reset-actions" }, button("Close", "primary", close))
       );
       if (typeof loadData === "function") {
@@ -222,4 +315,7 @@
   }
 
   openButton.addEventListener("click", open);
+  if (scanButton) {
+    scanButton.addEventListener("click", scan);
+  }
 })();
