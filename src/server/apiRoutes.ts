@@ -5,6 +5,9 @@ import type { Storyline } from "../storylines/deriveStorylines.js";
 import type { ProgressStore } from "../progress/store.js";
 import type { TaskCache } from "../tarkovData/cache.js";
 import { buildStatusResponse, buildProgressResponse, buildTasksResponse } from "./apiData.js";
+import { buildChaptersResponse, setChapterStatus, setObjectiveDone } from "./chaptersApi.js";
+import { STORY_CHAPTERS } from "../storyChapters/chapters.js";
+import type { StoryChapter } from "../storyChapters/types.js";
 import { buildWipeOptions, buildWipePreview, performWipe, parseSince } from "./wipeApi.js";
 
 export interface ApiDeps {
@@ -14,6 +17,8 @@ export interface ApiDeps {
   getStorylines: () => Storyline[];
   /** Where the game's logs live — the "reset my progress" flow reads them to help pick the reset moment. */
   logsRootDir: string;
+  /** Defaults to the built-in story chapters; tests pass their own. */
+  chapters?: StoryChapter[];
 }
 
 // The dashboard sends this on every state-changing request. A web page on some
@@ -23,8 +28,15 @@ export interface ApiDeps {
 const TRACKER_HEADER = "x-requested-with";
 const TRACKER_HEADER_VALUE = "tarkov-tracker";
 
+function requireTrackerHeader(req: { headers: Record<string, string | string[] | undefined> }): void {
+  if (req.headers[TRACKER_HEADER] !== TRACKER_HEADER_VALUE) {
+    throw new HttpError(403, "This request must come from the tracker's own dashboard");
+  }
+}
+
 export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
   const wipeDeps = { store: deps.store, logsRootDir: deps.logsRootDir, getTasks: deps.getTasks };
+  const chapterDeps = { store: deps.store, chapters: deps.chapters ?? STORY_CHAPTERS };
 
   return {
     "GET /api/status": () => buildStatusResponse(deps.getCache(), deps.store),
@@ -39,10 +51,23 @@ export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
     "GET /api/wipe/options": () => buildWipeOptions(wipeDeps),
     "GET /api/wipe/preview": (url) => buildWipePreview(wipeDeps, parseSince(url.searchParams.get("since"))),
     "POST /api/wipe": (url, req) => {
-      if (req.headers[TRACKER_HEADER] !== TRACKER_HEADER_VALUE) {
-        throw new HttpError(403, "This request must come from the tracker's own dashboard");
-      }
+      requireTrackerHeader(req);
       return performWipe(wipeDeps, parseSince(url.searchParams.get("since")));
+    },
+
+    "GET /api/chapters": () => buildChaptersResponse(chapterDeps),
+    "POST /api/chapters/status": (url, req) => {
+      requireTrackerHeader(req);
+      return setChapterStatus(chapterDeps, url.searchParams.get("chapter"), url.searchParams.get("status"));
+    },
+    "POST /api/chapters/objective": (url, req) => {
+      requireTrackerHeader(req);
+      return setObjectiveDone(
+        chapterDeps,
+        url.searchParams.get("chapter"),
+        url.searchParams.get("index"),
+        url.searchParams.get("done") === "1"
+      );
     },
   };
 }

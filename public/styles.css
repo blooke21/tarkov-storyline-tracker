@@ -268,3 +268,207 @@ main {
   gap: 0.6rem;
   margin-top: 0.9rem;
 }
+
+/* Story chapters and clickable quest lines */
+.section-title {
+  margin: 0 0 0.25rem;
+  font-size: 1.15rem;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0.75rem;
+}
+
+#chapters {
+  margin-bottom: 1.5rem;
+}
+
+.chapter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.75rem;
+}
+
+.storyline-card.selectable {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.storyline-card.selectable:hover,
+.storyline-card.selectable:focus-visible {
+  border-color: var(--accent);
+}
+
+.storyline-card.selected {
+  border-color: var(--accent);
+  background: #20281f;
+}
+
+.chapter-card.active {
+  border-color: var(--accent);
+}
+
+.chapter-card.done {
+  opacity: 0.6;
+}
+
+.chapter-steps {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0.4rem 0 0.3rem;
+}
+
+.badge.active {
+  background: var(--accent);
+  color: #0f1115;
+}
+
+.badge.done {
+  background: #3b4a38;
+}
+
+#storylines > * + * {
+  margin-top: 0.75rem;
+}
+
+#storylines .hint {
+  margin-bottom: 0;
+}
+
+.more-lines summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-bottom: 0.6rem;
+}
+
+.chain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.6rem;
+}
+
+.chain-grid .storyline-card h3 {
+  font-size: 0.9rem;
+}
+
+body.viewing-chapter #chapters,
+body.viewing-chapter #browse {
+  display: none;
+}
+
+/* "Working on now" panel and the chapter view */
+.focus-panel,
+#chapter-view {
+  background: var(--card-bg);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.focus-panel[hidden],
+#chapter-view[hidden] {
+  display: none;
+}
+
+.focus-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.focus-head h2,
+.chapter-title {
+  margin: 0.25rem 0;
+  font-size: 1.2rem;
+}
+
+.focus-panel h3,
+#chapter-view h3 {
+  margin: 1rem 0 0.4rem;
+  font-size: 1rem;
+}
+
+.now-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 0.7rem 1rem;
+  margin: 0.5rem 0;
+}
+
+.now-box h3,
+.now-box h4 {
+  margin: 0 0 0.3rem;
+}
+
+.now-box ul {
+  margin: 0.4rem 0;
+  padding-left: 1.2rem;
+}
+
+.now-box a,
+.available-list a,
+#chapter-view a {
+  color: var(--accent);
+}
+
+.now-step {
+  font-size: 1.1rem;
+  margin: 0.3rem 0 0.6rem;
+}
+
+.now-substeps .optional,
+.step.optional {
+  color: var(--muted);
+}
+
+.now-substeps .done,
+.step.done {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.step-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0;
+}
+
+.step {
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.step label {
+  cursor: pointer;
+}
+
+.step.depth-2 {
+  margin-left: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.step.depth-3 {
+  margin-left: 3rem;
+  font-size: 0.9rem;
+}
+
+.step.current {
+  background: #20281f;
+  outline: 1px solid var(--accent);
+}
+
+#chapter-view .reset-actions {
+  margin: 0.8rem 0;
+}

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tarkov Storyline Tracker</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
@@ -14,42 +15,55 @@
   <main>
     <section id="overall-progress" class="storyline-card overall" aria-label="Overall progress"></section>
 
-    <section id="storylines" aria-label="Storyline progress"></section>
+    <section id="chapters" aria-label="Story chapters"></section>
 
-    <section id="reset-help" class="notice" aria-label="Help if the numbers look wrong">
-      <p>
-        <strong>Numbers look wrong?</strong>
-        Too many quests showing as done, or quests you just finished not showing as completed?
-        That usually means you reset your character and the tracker is still counting your old one.
-      </p>
-      <button id="open-reset" type="button" class="button">Check &amp; reset my progress</button>
-    </section>
+    <section id="chapter-view" aria-label="Story chapter" hidden></section>
 
-    <section id="reset-panel" class="reset-panel" aria-label="Reset progress" hidden></section>
+    <div id="browse">
+      <section id="storylines" aria-label="Quest lines"></section>
 
-    <section aria-label="Filters" class="filters">
-      <label>
-        Storyline
-        <select id="filter-storyline"><option value="">All</option></select>
-      </label>
-      <label>
-        Trader
-        <select id="filter-trader"><option value="">All</option></select>
-      </label>
-      <label>
-        Map
-        <select id="filter-map"><option value="">All</option></select>
-      </label>
-      <label>
-        <input type="checkbox" id="filter-actionable" />
-        Next up only
-      </label>
-    </section>
+      <section id="reset-help" class="notice" aria-label="Help if the numbers look wrong">
+        <p>
+          <strong>Numbers look wrong?</strong>
+          Too many quests showing as done, or quests you just finished not showing as completed?
+          That usually means you reset your character and the tracker is still counting your old one.
+        </p>
+        <button id="open-reset" type="button" class="button">Check &amp; reset my progress</button>
+      </section>
 
-    <section id="tasks" aria-label="Tasks"></section>
+      <section id="reset-panel" class="reset-panel" aria-label="Reset progress" hidden></section>
+
+      <section aria-label="Filters" class="filters">
+        <label>
+          Quest line
+          <select id="filter-storyline"><option value="">All</option></select>
+        </label>
+        <label>
+          Trader
+          <select id="filter-trader"><option value="">All</option></select>
+        </label>
+        <label>
+          Map
+          <select id="filter-map"><option value="">All</option></select>
+        </label>
+        <label>
+          <input type="checkbox" id="filter-actionable" />
+          Next up only
+        </label>
+        <label>
+          <input type="checkbox" id="filter-hide-completed" />
+          Hide completed
+        </label>
+      </section>
+
+      <section id="focus-panel" class="focus-panel" aria-label="What to do in this quest line" hidden></section>
+
+      <section id="tasks" aria-label="Tasks"></section>
+    </div>
   </main>
 
   <script src="/app.js"></script>
+  <script src="/chapters.js"></script>
   <script src="/reset.js"></script>
 </body>
 </html>

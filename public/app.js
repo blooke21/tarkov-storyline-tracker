@@ -1,6 +1,7 @@
 const state = {
   tasks: [],
   storylines: [],
+  moreLinesOpen: false,
 };
 
 function escapeHtml(value) {
@@ -34,8 +35,9 @@ async function loadData() {
 
     renderStatus(status);
     renderOverall(progress.overall);
-    renderStorylines(state.storylines);
     populateFilters(state.tasks);
+    renderStorylines(state.storylines);
+    renderFocus();
     renderTasks();
   } catch (error) {
     console.error("Failed to load dashboard data:", error);
@@ -70,20 +72,148 @@ function renderStatus(status) {
   line.textContent = parts.join(" • ");
 }
 
+function el(tag, props, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props || {})) {
+    if (key === "onclick") {
+      node.addEventListener("click", value);
+    } else {
+      node[key] = value;
+    }
+  }
+  node.append(...children);
+  return node;
+}
+
+function percentOf(done, total) {
+  return total === 0 ? 0 : Math.round((done / total) * 100);
+}
+
+function selectedStoryline() {
+  return document.getElementById("filter-storyline").value;
+}
+
+function selectStoryline(id) {
+  document.getElementById("filter-storyline").value = id;
+  renderStorylines(state.storylines);
+  renderFocus();
+  renderTasks();
+  if (id) {
+    document.getElementById("focus-panel").scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+}
+
+function storylineCard(storyline, selected) {
+  const percent = percentOf(storyline.completedTasks, storyline.totalTasks);
+  const bar = el("div", { className: "progress-bar" }, el("div"));
+  bar.firstChild.style.width = `${percent}%`;
+  const title = el("h3", {}, `${storyline.name} — ${storyline.completedTasks}/${storyline.totalTasks} (${percent}%)`);
+  if (storyline.inProgress) {
+    title.append(" ", el("span", { className: "badge active" }, "In progress"));
+  }
+  return el(
+    "button",
+    {
+      type: "button",
+      className: "storyline-card selectable" + (selected ? " selected" : ""),
+      title: selected ? "Click to show all quests again" : "Click to see only this quest line",
+      onclick: () => selectStoryline(selected ? "" : storyline.id),
+    },
+    title,
+    bar
+  );
+}
+
 function renderStorylines(storylines) {
   const container = document.getElementById("storylines");
-  container.innerHTML = "";
-  for (const storyline of storylines) {
-    const percent =
-      storyline.totalTasks === 0 ? 0 : Math.round((storyline.completedTasks / storyline.totalTasks) * 100);
-    const card = document.createElement("div");
-    card.className = "storyline-card";
-    card.innerHTML = `
-      <h3>${escapeHtml(storyline.name)} — ${storyline.completedTasks}/${storyline.totalTasks} (${percent}%)</h3>
-      <div class="progress-bar"><div style="width: ${percent}%"></div></div>
-    `;
-    container.appendChild(card);
+  const selected = selectedStoryline();
+  const big = storylines.filter((s) => s.kind !== "chain");
+  const chains = storylines.filter((s) => s.kind === "chain");
+  const startedChains = chains.filter((s) => s.inProgress || s.id === selected);
+  const otherChains = chains.filter((s) => !startedChains.includes(s));
+
+  const nodes = [
+    el("h2", { className: "section-title" }, "Quest lines"),
+    el("p", { className: "hint" }, "Click one to see only its quests and what to do next."),
+    ...big.map((s) => storylineCard(s, s.id === selected)),
+    ...startedChains.map((s) => storylineCard(s, s.id === selected)),
+  ];
+  if (otherChains.length > 0) {
+    const details = el("details", { className: "more-lines" }, el("summary", {}, `More quest chains (${otherChains.length})`));
+    details.append(el("div", { className: "chain-grid" }, ...otherChains.map((s) => storylineCard(s, false))));
+    // Keep the list open across the 15-second refresh if the player opened it.
+    details.open = state.moreLinesOpen;
+    details.addEventListener("toggle", () => {
+      state.moreLinesOpen = details.open;
+    });
+    nodes.push(details);
   }
+  container.replaceChildren(...nodes);
+}
+
+function taskLine(task) {
+  const line = el("li", {}, el("strong", {}, task.name), ` — ${task.trader}${task.map ? " • " + task.map : ""}`);
+  if (task.wikiLink && isSafeHttpUrl(task.wikiLink)) {
+    line.append(" ", el("a", { href: task.wikiLink, target: "_blank", rel: "noopener" }, "wiki"));
+  }
+  return line;
+}
+
+// "Working on now" for the selected quest line: the quests the player has
+// accepted, with what's left to do, and what they can start next.
+function renderFocus() {
+  const panel = document.getElementById("focus-panel");
+  const id = selectedStoryline();
+  const storyline = state.storylines.find((s) => s.id === id);
+  panel.hidden = !storyline;
+  if (!storyline) {
+    panel.replaceChildren();
+    return;
+  }
+
+  const tasks = state.tasks.filter((t) => t.storylineIds.includes(id));
+  const working = tasks.filter((t) => t.status === "accepted");
+  const available = tasks.filter((t) => t.actionable && t.status !== "accepted" && t.status !== "completed");
+  const MAX_AVAILABLE = 8;
+
+  const nodes = [
+    el(
+      "div",
+      { className: "focus-head" },
+      el("h2", {}, `${storyline.name} — ${storyline.completedTasks}/${storyline.totalTasks} done`),
+      el("button", { type: "button", className: "button", onclick: () => selectStoryline("") }, "✕ Show all quests")
+    ),
+    el("h3", {}, `Working on now (${working.length})`),
+  ];
+
+  if (working.length === 0) {
+    nodes.push(el("p", { className: "hint" }, "None of these quests is active right now. Pick one from Available to start below."));
+  }
+  for (const task of working) {
+    const objectives = task.objectives.filter((o) => !o.optional).map((o) => el("li", {}, o.description));
+    const card = el(
+      "div",
+      { className: "now-box" },
+      el("h4", {}, task.name),
+      el("div", { className: "task-meta" }, `${task.trader}${task.map ? " • " + task.map : ""}`),
+      el("ul", {}, ...objectives)
+    );
+    if (task.wikiLink && isSafeHttpUrl(task.wikiLink)) {
+      card.append(el("a", { href: task.wikiLink, target: "_blank", rel: "noopener" }, "View on wiki"));
+    }
+    nodes.push(card);
+  }
+
+  nodes.push(el("h3", {}, `Available to start (${available.length})`));
+  if (available.length === 0) {
+    nodes.push(el("p", { className: "hint" }, "Nothing new is unlocked in this line right now."));
+  } else {
+    nodes.push(el("ul", { className: "available-list" }, ...available.slice(0, MAX_AVAILABLE).map(taskLine)));
+    if (available.length > MAX_AVAILABLE) {
+      nodes.push(el("p", { className: "hint" }, `…and ${available.length - MAX_AVAILABLE} more in the list below.`));
+    }
+  }
+  panel.replaceChildren(...nodes);
 }
 
 function populateFilters(tasks) {
@@ -127,12 +257,14 @@ function renderTasks() {
   const traderFilter = document.getElementById("filter-trader").value;
   const mapFilter = document.getElementById("filter-map").value;
   const actionableOnly = document.getElementById("filter-actionable").checked;
+  const hideCompleted = document.getElementById("filter-hide-completed").checked;
 
   const filtered = state.tasks.filter((task) => {
     if (storylineFilter && !task.storylineIds.includes(storylineFilter)) return false;
     if (traderFilter && task.trader !== traderFilter) return false;
     if (mapFilter && task.map !== mapFilter) return false;
     if (actionableOnly && !(task.actionable && task.status !== "completed")) return false;
+    if (hideCompleted && task.status === "completed") return false;
     return true;
   });
 
@@ -168,9 +300,11 @@ function renderTasks() {
   }
 }
 
-for (const id of ["filter-storyline", "filter-trader", "filter-map", "filter-actionable"]) {
+for (const id of ["filter-trader", "filter-map", "filter-actionable", "filter-hide-completed"]) {
   document.getElementById(id).addEventListener("change", renderTasks);
 }
+// Choosing a quest line from the dropdown does the same as clicking its card.
+document.getElementById("filter-storyline").addEventListener("change", (event) => selectStoryline(event.target.value));
 
 loadData();
 setInterval(loadData, 15000);

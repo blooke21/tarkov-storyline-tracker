@@ -54,7 +54,33 @@ describe("buildProgressResponse", () => {
     const response = buildProgressResponse(sampleTasks, storylines, store);
 
     const kappa = response.storylines.find((s) => s.id === "kappa");
-    expect(kappa).toEqual({ id: "kappa", name: "Path to Kappa", totalTasks: 2, completedTasks: 1 });
+    expect(kappa).toEqual({
+      id: "kappa",
+      name: "Path to Kappa",
+      totalTasks: 2,
+      completedTasks: 1,
+      kind: null,
+      inProgress: true,
+    });
+  });
+
+  it("marks a line in progress when something in it is accepted, or part of it is done", () => {
+    store = new ProgressStore(":memory:");
+    const storylines = [
+      { id: "a", name: "A", taskIds: ["sample-1", "sample-2"] },
+      { id: "b", name: "B", taskIds: ["sample-1"] },
+      { id: "c", name: "C", taskIds: ["sample-2"] },
+    ];
+    const flags = () => buildProgressResponse(sampleTasks, storylines, store!).storylines.map((s) => s.inProgress);
+
+    expect(flags()).toEqual([false, false, false]);
+
+    store.recordEvent("sample-2", "accepted");
+    expect(flags()).toEqual([true, false, true]);
+
+    // B is now fully done (finished, so not "in progress"); A is part-done.
+    store.recordEvent("sample-1", "completed");
+    expect(flags()).toEqual([true, false, true]);
   });
 
   it("computes overall progress from the full task list, not summed from storylines", () => {

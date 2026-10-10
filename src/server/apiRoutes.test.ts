@@ -187,3 +187,60 @@ describe("wipe routes over HTTP", () => {
     expect(store!.getProgressSince()).toBeNull();
   });
 });
+
+describe("story chapter routes over HTTP", () => {
+  async function boot(): Promise<void> {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
+    store = new ProgressStore(":memory:");
+    startTestServer();
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+  }
+
+  type Chapters = { chapters: Array<{ id: string; status: string; objectives: Array<{ done: boolean }> }> };
+
+  it("GET /api/chapters lists the built-in chapters, Tour first", async () => {
+    await boot();
+
+    const body = (await (await fetch(`${baseUrl()}/api/chapters`)).json()) as Chapters;
+
+    expect(body.chapters.map((c) => c.id).slice(0, 2)).toEqual(["tour", "falling-skies"]);
+    expect(body.chapters.every((c) => c.status === "not-started")).toBe(true);
+  });
+
+  it("refuses to change anything without the tracker header", async () => {
+    await boot();
+
+    const status = await fetch(`${baseUrl()}/api/chapters/status?chapter=tour&status=active`, { method: "POST" });
+    const objective = await fetch(`${baseUrl()}/api/chapters/objective?chapter=tour&index=0&done=1`, { method: "POST" });
+
+    expect(status.status).toBe(403);
+    expect(objective.status).toBe(403);
+    const body = (await (await fetch(`${baseUrl()}/api/chapters`)).json()) as Chapters;
+    expect(body.chapters.find((c) => c.id === "tour")?.status).toBe("not-started");
+  });
+
+  it("marks a chapter active and ticks a step, returning the updated chapters", async () => {
+    await boot();
+
+    await fetch(`${baseUrl()}/api/chapters/status?chapter=falling-skies&status=active`, { method: "POST", headers: TRACKER_HEADER });
+    const response = await fetch(`${baseUrl()}/api/chapters/objective?chapter=tour&index=0&done=1`, {
+      method: "POST",
+      headers: TRACKER_HEADER,
+    });
+    const body = (await response.json()) as Chapters;
+
+    expect(response.status).toBe(200);
+    expect(body.chapters.find((c) => c.id === "falling-skies")?.status).toBe("active");
+    expect(body.chapters.find((c) => c.id === "tour")?.objectives[0].done).toBe(true);
+  });
+
+  it("answers a bad chapter with 404 and a bad status with 400", async () => {
+    await boot();
+
+    const unknown = await fetch(`${baseUrl()}/api/chapters/status?chapter=nope&status=active`, { method: "POST", headers: TRACKER_HEADER });
+    const badStatus = await fetch(`${baseUrl()}/api/chapters/status?chapter=tour&status=sideways`, { method: "POST", headers: TRACKER_HEADER });
+
+    expect(unknown.status).toBe(404);
+    expect(badStatus.status).toBe(400);
+  });
+});

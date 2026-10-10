@@ -25,6 +25,9 @@ export interface StorylineProgress {
   name: string;
   totalTasks: number;
   completedTasks: number;
+  kind: "chain" | null;
+  /** The player has started this line: something in it is accepted, or some of it is done but not all. */
+  inProgress: boolean;
 }
 
 export interface ProgressResponse {
@@ -43,12 +46,19 @@ export function buildProgressResponse(
       totalTasks: tasks.length,
       completedTasks: tasks.filter((task) => statuses.get(task.id) === "completed").length,
     },
-    storylines: storylines.map((storyline) => ({
-      id: storyline.id,
-      name: storyline.name,
-      totalTasks: storyline.taskIds.length,
-      completedTasks: storyline.taskIds.filter((id) => statuses.get(id) === "completed").length,
-    })),
+    storylines: storylines.map((storyline) => {
+      const completedTasks = storyline.taskIds.filter((id) => statuses.get(id) === "completed").length;
+      const totalTasks = storyline.taskIds.length;
+      const hasAccepted = storyline.taskIds.some((id) => statuses.get(id) === "accepted");
+      return {
+        id: storyline.id,
+        name: storyline.name,
+        totalTasks,
+        completedTasks,
+        kind: storyline.kind ?? null,
+        inProgress: hasAccepted || (completedTasks > 0 && completedTasks < totalTasks),
+      };
+    }),
   };
 }
 

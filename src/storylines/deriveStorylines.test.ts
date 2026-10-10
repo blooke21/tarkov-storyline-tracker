@@ -73,4 +73,31 @@ describe("deriveStorylines", () => {
     const uncovered = sampleTasks.filter((t) => !coveredIds.has(t.id));
     expect(uncovered).toEqual([]);
   });
+
+  describe("quest chains", () => {
+    const named = (id: string, name: string) => makeTask({ id, name });
+
+    it("groups quests named '<Name> - Part N' into a chain of that name", () => {
+      const tasks = [
+        named("1", "Chemical - Part 1"),
+        named("2", "Chemical - Part 2"),
+        named("3", "Spa Tour - Part 1"),
+        named("4", "Spa Tour - Part 2"),
+        named("5", "Unrelated"),
+      ];
+
+      const chains = deriveStorylines(tasks).filter((s) => s.kind === "chain");
+
+      expect(chains.map((c) => [c.id, c.name, c.taskIds])).toEqual([
+        ["chain:chemical", "Chemical", ["1", "2"]],
+        ["chain:spa-tour", "Spa Tour", ["3", "4"]],
+      ]);
+    });
+
+    it("ignores a lone '- Part 1' with no sibling, and quests that merely contain 'Part' elsewhere", () => {
+      const tasks = [named("1", "Solo - Part 1"), named("2", "Part Time Job"), named("3", "Counterpart")];
+
+      expect(deriveStorylines(tasks).filter((s) => s.kind === "chain")).toEqual([]);
+    });
+  });
 });
