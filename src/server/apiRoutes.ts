@@ -10,6 +10,8 @@ import { STORY_CHAPTERS } from "../storyChapters/chapters.js";
 import type { StoryChapter } from "../storyChapters/types.js";
 import { scanLogs } from "./scanApi.js";
 import { setPinned } from "./pinsApi.js";
+import { buildPrestigeResponse, setPrestigeCondition, setPrestigeLevel } from "./prestigeApi.js";
+import type { PrestigeLevel } from "../prestige/prestigeData.js";
 import { buildWipeOptions, buildWipePreview, performWipe, parseSince } from "./wipeApi.js";
 
 export interface ApiDeps {
@@ -21,6 +23,8 @@ export interface ApiDeps {
   logsRootDir: string;
   /** Defaults to the built-in story chapters; tests pass their own. */
   chapters?: StoryChapter[];
+  /** The prestige requirements. Optional: with none, the dashboard says they are unavailable. */
+  getPrestige?: () => PrestigeLevel[];
 }
 
 // The dashboard sends this on every state-changing request. A web page on some
@@ -38,6 +42,7 @@ function requireTrackerHeader(req: { headers: Record<string, string | string[] |
 
 export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
   const wipeDeps = { store: deps.store, logsRootDir: deps.logsRootDir, getTasks: deps.getTasks };
+  const prestigeDeps = { store: deps.store, getTasks: deps.getTasks, getLevels: deps.getPrestige ?? (() => []) };
   const chapterDeps = { store: deps.store, chapters: deps.chapters ?? STORY_CHAPTERS };
 
   return {
@@ -69,6 +74,16 @@ export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
         url.searchParams.get("task"),
         url.searchParams.get("pinned") === "1"
       );
+    },
+
+    "GET /api/prestige": () => buildPrestigeResponse(prestigeDeps),
+    "POST /api/prestige/level": (url, req) => {
+      requireTrackerHeader(req);
+      return setPrestigeLevel(prestigeDeps, url.searchParams.get("level"));
+    },
+    "POST /api/prestige/requirement": (url, req) => {
+      requireTrackerHeader(req);
+      return setPrestigeCondition(prestigeDeps, url.searchParams.get("requirement"), url.searchParams.get("done") === "1");
     },
 
     "GET /api/chapters": () => buildChaptersResponse(chapterDeps),

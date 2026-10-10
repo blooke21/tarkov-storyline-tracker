@@ -161,6 +161,28 @@ function renderPinned() {
   panel.replaceChildren(...nodes);
 }
 
+// A section the player can fold away (Story chapters, Quest lines, Prestige).
+// Whether it is open is remembered in this browser; if storage is blocked it
+// simply starts open every time.
+function collapsibleSection(id, title, ...children) {
+  const key = `tarkovTracker.section.${id}`;
+  let open = true;
+  try {
+    open = localStorage.getItem(key) !== "closed";
+  } catch {
+    // Storage unavailable: stay open.
+  }
+  const details = el("details", { className: "section", open }, el("summary", {}, el("h2", { className: "section-title" }, title)), ...children);
+  details.addEventListener("toggle", () => {
+    try {
+      localStorage.setItem(key, details.open ? "open" : "closed");
+    } catch {
+      // Not remembered; fine.
+    }
+  });
+  return details;
+}
+
 function percentOf(done, total) {
   return total === 0 ? 0 : Math.round((done / total) * 100);
 }
@@ -209,7 +231,6 @@ function renderStorylines(storylines) {
   const otherChains = chains.filter((s) => !startedChains.includes(s));
 
   const nodes = [
-    el("h2", { className: "section-title" }, "Quest lines"),
     el("p", { className: "hint" }, "Click one to see only its quests and what to do next."),
     ...big.map((s) => storylineCard(s, s.id === selected)),
     ...startedChains.map((s) => storylineCard(s, s.id === selected)),
@@ -224,7 +245,7 @@ function renderStorylines(storylines) {
     });
     nodes.push(details);
   }
-  container.replaceChildren(...nodes);
+  container.replaceChildren(collapsibleSection("quest-lines", "Quest lines", ...nodes));
 }
 
 function taskLine(task) {

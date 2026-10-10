@@ -316,3 +316,42 @@ describe("pin route over HTTP", () => {
     expect(missing.status).toBe(404);
   });
 });
+
+describe("prestige routes over HTTP", () => {
+  it("serves the requirements, and changes the level only with the tracker header", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
+    store = new ProgressStore(":memory:");
+    const routes = createApiRoutes({
+      store,
+      getCache: () => null,
+      getTasks: () => sampleTasks,
+      getStorylines: () => [],
+      logsRootDir: join(tempDir, "logs"),
+      getPrestige: () => [{ level: 1, conditions: [{ id: "c1", kind: "playerLevel", level: 15 }] }],
+    });
+    server = createServer({ apiRoutes: routes, staticDir: tempDir });
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+
+    const first = (await (await fetch(`${baseUrl()}/api/prestige`)).json()) as { available: boolean; next: { level: number } | null };
+    expect(first).toMatchObject({ available: true, next: { level: 1 } });
+
+    expect((await fetch(`${baseUrl()}/api/prestige/level?level=1`, { method: "POST" })).status).toBe(403);
+
+    const moved = (await (
+      await fetch(`${baseUrl()}/api/prestige/level?level=1`, { method: "POST", headers: TRACKER_HEADER })
+    ).json()) as { current: number; next: unknown };
+    expect(moved).toMatchObject({ current: 1, next: null });
+    expect((await fetch(`${baseUrl()}/api/prestige/level?level=9`, { method: "POST", headers: TRACKER_HEADER })).status).toBe(400);
+  });
+
+  it("says the requirements are unavailable when none were loaded", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
+    store = new ProgressStore(":memory:");
+    startTestServer();
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+
+    const body = (await (await fetch(`${baseUrl()}/api/prestige`)).json()) as { available: boolean };
+
+    expect(body.available).toBe(false);
+  });
+});

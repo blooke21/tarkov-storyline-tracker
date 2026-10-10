@@ -47,6 +47,7 @@ function setUp(overrides: Partial<AppConfig> = {}) {
     dbPath: join(tempDir, "progress.sqlite"),
     staticDir,
     fetchImpl: fake.fetchImpl,
+    prestigeLevels: [],
     ...overrides,
   };
   return { config, fake, logsRootDir };

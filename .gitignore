@@ -3,3 +3,5 @@ dist/
 *.tsbuildinfo
 .tarkov-cache.json
 *.sqlite
+.tarkov-prestige-cache.json
+*.tmp

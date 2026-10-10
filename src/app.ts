@@ -10,6 +10,8 @@ import {
   loadCache,
   parseGameMode,
 } from "./index.js";
+import { syncPrestige } from "./prestige/prestigeData.js";
+import type { PrestigeLevel } from "./prestige/prestigeData.js";
 import type { TarkovTask, TaskCache, GameMode } from "./index.js";
 import { createServer } from "./server/createServer.js";
 import { createApiRoutes } from "./server/apiRoutes.js";
@@ -25,6 +27,10 @@ export interface AppConfig {
   pollIntervalMs?: number;
   /** Which game mode's quests to track. Defaults to the TARKOV_GAME_MODE env var, then PvE. */
   gameMode?: GameMode;
+  /** Where the prestige requirements are cached. Defaults to the project folder. */
+  prestigeCachePath?: string;
+  /** Use these prestige requirements instead of downloading them (for tests). */
+  prestigeLevels?: PrestigeLevel[];
 }
 
 export interface RunningApp {
@@ -53,6 +59,9 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
   const staticDir = config.staticDir ?? join(PROJECT_ROOT, "public");
 
   const tasks: TarkovTask[] = await syncTaskGraph(cachePath, { fetchImpl: config.fetchImpl, gameMode });
+  const prestigeLevels =
+    config.prestigeLevels ??
+    (await syncPrestige(config.prestigeCachePath ?? join(PROJECT_ROOT, ".tarkov-prestige-cache.json"), { fetchImpl: config.fetchImpl, gameMode }));
 
   const store = new ProgressStore(dbPath);
 
@@ -69,6 +78,7 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
     getTasks: () => tasks,
     getStorylines,
     logsRootDir,
+    getPrestige: () => prestigeLevels,
   });
 
   const server = createServer({ apiRoutes: routes, staticDir });

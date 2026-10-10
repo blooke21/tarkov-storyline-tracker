@@ -550,3 +550,43 @@ body.viewing-chapter #browse {
 .step .guide {
   margin-left: 0.5rem;
 }
+
+/* Collapsible sections */
+.section > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.section > summary::before {
+  content: "\25B8";
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+
+.section[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.section > summary .section-title {
+  margin: 0;
+}
+
+.section > * + *:not(summary) {
+  margin-top: 0.75rem;
+}
+
+#prestige {
+  margin-bottom: 1.5rem;
+}
+
+#prestige label select {
+  margin-left: 0.4rem;
+}

@@ -191,13 +191,16 @@
       return card;
     });
     grid.replaceChildren(
-      el("h2", { className: "section-title" }, "Story chapters"),
-      el(
-        "p",
-        { className: "hint" },
-        "Pick the chapter you're on to see only what to do next. The game doesn't log story progress, so you tick steps off yourself."
-      ),
-      el("div", { className: "chapter-grid" }, ...cards)
+      collapsibleSection(
+        "story-chapters",
+        "Story chapters",
+        el(
+          "p",
+          { className: "hint" },
+          "Pick the chapter you're on to see only what to do next. The game doesn't log story progress, so you tick steps off yourself."
+        ),
+        el("div", { className: "chapter-grid" }, ...cards)
+      )
     );
   }
 
