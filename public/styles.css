@@ -647,3 +647,64 @@ header .reset-panel {
   border-radius: 4px;
   word-break: break-all;
 }
+
+/* "Bring into raid" box, fixed to the bottom-left of the screen */
+.bring-box {
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 40;
+  width: min(22rem, calc(100vw - 2rem));
+  max-height: 45vh;
+  overflow-y: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  font-size: 0.85rem;
+}
+
+.bring-box[hidden] {
+  display: none;
+}
+
+.bring-header {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--card-bg);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 0.55rem 0.8rem;
+  cursor: pointer;
+}
+
+.bring-quest {
+  padding: 0.5rem 0.8rem 0;
+}
+
+.bring-quest a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.bring-quest ul {
+  margin: 0.25rem 0 0.3rem;
+  padding-left: 1.1rem;
+}
+
+.bring-note {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.bring-credit {
+  margin: 0.4rem 0.8rem 0.6rem;
+  font-size: 0.75rem;
+}

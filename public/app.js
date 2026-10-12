@@ -3,6 +3,7 @@ const state = {
   storylines: [],
   moreLinesOpen: false,
   pendingQuest: null,
+  bringSignature: null,
   // Wiki walkthroughs for quests: opened ones, and what has been fetched (a guide, or "loading" / "error").
   openGuides: new Set(),
   questGuides: {},
@@ -44,6 +45,7 @@ async function loadData() {
     renderStorylines(state.storylines);
     renderFocus();
     renderTasks();
+    refreshBringBox();
     if (state.pendingQuest) {
       const id = state.pendingQuest;
       state.pendingQuest = null;
@@ -168,6 +170,7 @@ async function togglePin(task) {
     renderPinned();
     renderFocus();
     renderTasks();
+    refreshBringBox();
   } catch (error) {
     console.error("Could not save the pin:", error);
     alert("Could not save that pin — is the tracker still running?");
@@ -272,6 +275,93 @@ function addQuestGuide(card, task) {
   if (node) {
     card.append(node);
   }
+}
+
+// ---- "bring into raid" box: what the pinned quests need on you (bottom-left of the screen) ----
+
+const BRING_BOX_KEY = "tarkovTracker.bringBox";
+
+// Asks the server only when the set of pinned, unfinished quests changes (the answer can involve a wiki lookup).
+async function refreshBringBox() {
+  const pinned = state.tasks.filter((t) => t.pinned && t.status !== "completed").map((t) => t.id);
+  const signature = pinned.join(",");
+  if (signature === state.bringSignature) {
+    return;
+  }
+  state.bringSignature = signature;
+  if (pinned.length === 0) {
+    renderBringBox([]);
+    return;
+  }
+  try {
+    const response = await fetch("/api/pinned/bring");
+    if (!response.ok) {
+      throw new Error(`${response.status}`);
+    }
+    renderBringBox((await response.json()).quests);
+  } catch (error) {
+    console.error("Could not load the items to bring:", error);
+    state.bringSignature = null; // try again on the next refresh
+  }
+}
+
+function renderBringBox(quests) {
+  const box = document.getElementById("bring-box");
+  const itemCount = quests.reduce((sum, quest) => sum + quest.items.length, 0);
+  box.hidden = itemCount === 0;
+  if (itemCount === 0) {
+    box.replaceChildren();
+    return;
+  }
+
+  let collapsed = false;
+  try {
+    collapsed = localStorage.getItem(BRING_BOX_KEY) === "collapsed";
+  } catch {
+    // Storage unavailable: starts open.
+  }
+
+  const header = el(
+    "button",
+    {
+      type: "button",
+      className: "bring-header",
+      title: collapsed ? "Show the list" : "Hide the list",
+      onclick: () => {
+        try {
+          localStorage.setItem(BRING_BOX_KEY, collapsed ? "open" : "collapsed");
+        } catch {
+          // Not remembered; fine.
+        }
+        renderBringBox(quests);
+      },
+    },
+    el("span", {}, `🎒 Bring into raid (${itemCount})`),
+    el("span", { className: "bring-toggle" }, collapsed ? "▴" : "▾")
+  );
+  const nodes = [header];
+
+  if (!collapsed) {
+    for (const quest of quests) {
+      const list = el(
+        "ul",
+        {},
+        ...quest.items.map((item) =>
+          el("li", {}, item.text, item.note ? el("span", { className: "bring-note" }, ` — ${item.note}`) : "")
+        )
+      );
+      nodes.push(
+        el(
+          "div",
+          { className: "bring-quest" },
+          el("a", { href: `#quest/${quest.taskId}`, title: "Show this quest", onclick: (event) => { event.preventDefault(); showQuest(quest.taskId); } }, quest.name),
+          list
+        )
+      );
+    }
+    nodes.push(el("p", { className: "hint bring-credit" }, "From the quest data and the wiki, for the quests you've pinned."));
+  }
+  box.replaceChildren(...nodes);
 }
 
 function pinButton(task) {

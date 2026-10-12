@@ -399,3 +399,33 @@ describe("quest walkthrough route over HTTP", () => {
     expect((await fetch(`${baseUrl()}/api/quests/guide?task=sample-1`)).status).toBe(404);
   });
 });
+
+describe("pinned 'bring into raid' route over HTTP", () => {
+  it("lists what pinned quests need, from the quest data", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
+    store = new ProgressStore(":memory:");
+    const withBring = [
+      {
+        ...sampleTasks[0],
+        objectives: [{ id: "o", type: "mark", description: "d", optional: false, bring: [{ kind: "marker" as const, names: ["MS2000 Marker"], count: 2 }] }],
+      },
+    ];
+    const routes = createApiRoutes({
+      store,
+      getCache: () => null,
+      getTasks: () => withBring,
+      getStorylines: () => [],
+      logsRootDir: join(tempDir, "logs"),
+    });
+    server = createServer({ apiRoutes: routes, staticDir: tempDir });
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+
+    expect(await (await fetch(`${baseUrl()}/api/pinned/bring`)).json()).toEqual({ quests: [] });
+
+    await fetch(`${baseUrl()}/api/pins?task=${withBring[0].id}&pinned=1`, { method: "POST", headers: TRACKER_HEADER });
+    const body = (await (await fetch(`${baseUrl()}/api/pinned/bring`)).json()) as { quests: Array<{ name: string; items: Array<{ text: string }> }> };
+
+    expect(body.quests).toHaveLength(1);
+    expect(body.quests[0].items).toEqual([{ text: "2× MS2000 Marker", note: null }]);
+  });
+});

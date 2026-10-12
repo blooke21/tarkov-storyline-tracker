@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { convertJsonFeed, fetchTasksFromJson, TARKOV_DEV_JSON_BASE_URL } from "./jsonClient.js";
+import { convertJsonFeed, extractBring, fetchTasksFromJson, TARKOV_DEV_JSON_BASE_URL } from "./jsonClient.js";
 import type { JsonFeed } from "./jsonClient.js";
 import { jsonFeedSample } from "./__fixtures__/jsonFeedSample.js";
 import { createFakeFeedFetch } from "./__fixtures__/fakeFeedFetch.js";
@@ -118,13 +118,13 @@ describe("convertJsonFeed (against real captured feed data)", () => {
 });
 
 describe("fetchTasksFromJson", () => {
-  it("defaults to the PvE feed and requests exactly the four files it needs", async () => {
+  it("defaults to the PvE feed and requests exactly the five files it needs", async () => {
     const fake = createFakeFeedFetch();
 
     await fetchTasksFromJson({ fetchImpl: fake.fetchImpl });
 
     expect([...fake.calls].sort()).toEqual(
-      ["tasks", "tasks_en", "traders_en", "maps_en"].map((f) => `${TARKOV_DEV_JSON_BASE_URL}/pve/${f}`).sort()
+      ["tasks", "tasks_en", "traders_en", "maps_en", "items_en"].map((f) => `${TARKOV_DEV_JSON_BASE_URL}/pve/${f}`).sort()
     );
   });
 
@@ -141,7 +141,7 @@ describe("fetchTasksFromJson", () => {
 
     const tasks = await fetchTasksFromJson({ fetchImpl: fake.fetchImpl });
 
-    expect(tasks).toEqual(convertJsonFeed(jsonFeedSample));
+    expect(tasks).toEqual(convertJsonFeed({ ...jsonFeedSample, itemsEn: {} }));
   });
 
   it("throws a clear error naming the file and status when a request fails", async () => {
@@ -168,5 +168,84 @@ describe("fetchTasksFromJson", () => {
     })) as unknown as typeof fetch;
 
     await expect(fetchTasksFromJson({ fetchImpl })).rejects.toThrow(/no data/);
+  });
+});
+
+describe("extractBring (what to take into a raid)", () => {
+  const items = {
+    "marker-id Name": "MS2000 Marker",
+    "chain-id Name": "Golden neck chain",
+    "flare-red Name": "26x75mm flare cartridge (Red)",
+    "flare-green Name": "26x75mm flare cartridge (Green)",
+    "key-a Name": "Dorm room 114 key",
+    "key-b Name": "Dorm room 214 key",
+    "gun-1 Name": "M4A1",
+    "vest-1 Name": "6B43 Zabralo-Sh body armor",
+    "vest-2 Name": "6B13 assault armor",
+  };
+  const bring = (objective: Record<string, unknown>) => extractBring(objective, items);
+
+  it("lists the marker for a mark objective, once per place it must be placed", () => {
+    expect(bring({ type: "mark", markerItem: "marker-id", count: 3 })).toEqual([{ kind: "marker", names: ["MS2000 Marker"], count: 3 }]);
+  });
+
+  it("lists items to plant, with how many", () => {
+    expect(bring({ type: "plantItem", items: ["chain-id"], count: 6 })).toEqual([{ kind: "item", names: ["Golden neck chain"], count: 6 }]);
+  });
+
+  it("offers every acceptable item for a use-any objective", () => {
+    expect(bring({ type: "useItem", useAny: ["flare-red", "flare-green"] })).toEqual([
+      { kind: "use", names: ["26x75mm flare cartridge (Red)", "26x75mm flare cartridge (Green)"], count: 1 },
+    ]);
+  });
+
+  it("needs every key group, with any one key in a group being enough", () => {
+    expect(bring({ type: "visit", requiredKeys: [["key-a", "key-b"], ["gun-1"]] })).toEqual([
+      { kind: "key", names: ["Dorm room 114 key", "Dorm room 214 key"], count: 1 },
+      { kind: "key", names: ["M4A1"], count: 1 },
+    ]);
+  });
+
+  it("lists a required weapon and required gear for a kill, but not a long list of allowed weapons", () => {
+    expect(bring({ type: "shoot", usingWeapon: ["gun-1"], wearing: [["vest-1", "vest-2"]] })).toEqual([
+      { kind: "weapon", names: ["M4A1"], count: 1 },
+      { kind: "gear", names: ["6B43 Zabralo-Sh body armor", "6B13 assault armor"], count: 1 },
+    ]);
+    const many = Array.from({ length: 10 }, (_, i) => `many-${i}`);
+    const named = Object.fromEntries(many.map((id, i) => [`${id} Name`, `Weapon ${i}`]));
+    expect(extractBring({ type: "shoot", usingWeapon: many }, named)).toEqual([]);
+  });
+
+  it("ignores items you hand in or find in the raid, and ids it can't name", () => {
+    expect(bring({ type: "giveItem", items: ["chain-id"], count: 2 })).toEqual([]);
+    expect(bring({ type: "findItem", items: ["chain-id"] })).toEqual([]);
+    expect(bring({ type: "plantItem", items: ["unknown-id"], count: 1 })).toEqual([]);
+  });
+
+  it("is attached to each objective when item names are available, and left off when they aren't", () => {
+    const withNames = convertJsonFeed({ ...jsonFeedSample, itemsEn: {} });
+    const without = convertJsonFeed(jsonFeedSample);
+
+    expect(withNames.every((t) => t.objectives.every((o) => Array.isArray(o.bring)))).toBe(true);
+    expect(without.every((t) => t.objectives.every((o) => o.bring === undefined))).toBe(true);
+  });
+
+  it("carries a marker objective's item through a full conversion", () => {
+    const feed: JsonFeed = {
+      tasks: {
+        t1: {
+          id: "t1",
+          name: "t1 name",
+          trader: "tr",
+          objectives: [{ id: "o1", type: "mark", markerItem: "marker-id", count: 2, description: "o1" }],
+        },
+      },
+      tasksEn: { "t1 name": "Wet Job", o1: "Mark 2 spots" },
+      tradersEn: {},
+      mapsEn: {},
+      itemsEn: items,
+    };
+
+    expect(convertJsonFeed(feed)[0].objectives[0].bring).toEqual([{ kind: "marker", names: ["MS2000 Marker"], count: 2 }]);
   });
 });

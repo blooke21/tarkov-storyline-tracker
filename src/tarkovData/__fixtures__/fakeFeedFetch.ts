@@ -46,6 +46,7 @@ export function createFakeFeedFetch(options: FakeFeedFetchOptions = {}): FakeFee
     tasks_en: feed.tasksEn,
     traders_en: feed.tradersEn,
     maps_en: feed.mapsEn,
+    items_en: feed.itemsEn ?? {},
   };
 
   const impl = async (input: string | URL, init?: RequestInit): Promise<Response> => {

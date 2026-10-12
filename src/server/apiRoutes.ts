@@ -11,6 +11,7 @@ import { STORY_CHAPTERS } from "../storyChapters/chapters.js";
 import type { StoryChapter } from "../storyChapters/types.js";
 import { scanLogs } from "./scanApi.js";
 import { setPinned } from "./pinsApi.js";
+import { buildBringResponse } from "./bringApi.js";
 import { buildPrestigeResponse, setPrestigeCondition, setPrestigeLevel } from "./prestigeApi.js";
 import type { PrestigeLevel } from "../prestige/prestigeData.js";
 import type { GameMode } from "../tarkovData/gameMode.js";
@@ -110,6 +111,8 @@ export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
       }
       return guide;
     },
+
+    "GET /api/pinned/bring": () => buildBringResponse({ store: deps.store, getTasks: deps.getTasks, getQuestGuide: deps.getQuestGuide }),
 
     "GET /api/prestige": () => buildPrestigeResponse(prestigeDeps),
     "POST /api/prestige/level": (url, req) => {

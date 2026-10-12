@@ -1,5 +1,5 @@
 import { DEFAULT_GAME_MODE, type GameMode } from "./gameMode.js";
-import type { TarkovTask } from "./types.js";
+import type { BringRequirement, TarkovTask } from "./types.js";
 
 /**
  * tarkov.dev's static JSON feed — the same data its own website runs on. It
@@ -47,6 +47,8 @@ export interface JsonFeed {
   tasksEn: Translations;
   tradersEn: Translations;
   mapsEn: Translations;
+  /** Item names ("<id> Name"). Without it the objectives carry no "bring" list. */
+  itemsEn?: Translations;
 }
 
 /** English text for a translation key, or undefined if it's missing or blank. */
@@ -56,6 +58,57 @@ function translate(table: Translations, key: string | null | undefined): string 
   }
   const value = table[key];
   return typeof value === "string" && value !== "" ? value : undefined;
+}
+
+const MAX_ALTERNATIVES = 6;
+const MAX_WEAPON_CHOICES = 4;
+
+/** Item ids -> distinct English names (ids it doesn't know are left out). */
+function itemNames(table: Translations, ids: unknown): string[] {
+  const list = Array.isArray(ids) ? ids : ids ? [ids] : [];
+  const names = list.flatMap((id) => (typeof id === "string" ? [translate(table, `${id} Name`)] : [])).filter((name): name is string => Boolean(name));
+  return [...new Set(names)];
+}
+
+/** [["a"], ["b", "c"]] or ["a", "b"] -> [["a"], ["b", "c"]]: every group is needed, any one item in a group will do. */
+function itemGroups(value: unknown): unknown[][] {
+  return Array.isArray(value) ? value.map((entry) => (Array.isArray(entry) ? entry : [entry])) : [];
+}
+
+/**
+ * What the player must take into a raid to do an objective, from the feed's
+ * structured fields: markers to place, items to plant or use, keys, and the
+ * weapon or gear a kill has to be made with. Items to hand in or find in the
+ * raid are not "bring" items and aren't listed.
+ */
+export function extractBring(objective: RawObjective, items: Translations): BringRequirement[] {
+  const count = typeof objective.count === "number" && objective.count >= 1 ? objective.count : 1;
+  const bring: BringRequirement[] = [];
+  const add = (kind: BringRequirement["kind"], names: string[], amount = 1, limit = MAX_ALTERNATIVES): void => {
+    if (names.length > 0 && names.length <= limit) {
+      bring.push({ kind, names, count: amount });
+    }
+  };
+
+  if (objective.type === "mark") {
+    add("marker", itemNames(items, objective.markerItem), count);
+  } else if (objective.type === "plantItem") {
+    add("item", itemNames(items, objective.items), count);
+  } else if (objective.type === "useItem") {
+    add("use", itemNames(items, objective.useAny), count);
+  } else if (objective.type === "shoot") {
+    add("weapon", itemNames(items, objective.usingWeapon), 1, MAX_WEAPON_CHOICES);
+    for (const group of itemGroups(objective.usingWeaponMods)) {
+      add("weapon", itemNames(items, group), 1, MAX_WEAPON_CHOICES);
+    }
+    for (const group of itemGroups(objective.wearing)) {
+      add("gear", itemNames(items, group));
+    }
+  }
+  for (const group of itemGroups(objective.requiredKeys)) {
+    add("key", itemNames(items, group));
+  }
+  return bring;
 }
 
 export function convertJsonFeed(feed: JsonFeed): TarkovTask[] {
@@ -83,6 +136,7 @@ export function convertJsonFeed(feed: JsonFeed): TarkovTask[] {
           objective.description ??
           "",
         optional: objective.optional === true,
+        ...(feed.itemsEn ? { bring: extractBring(objective, feed.itemsEn) } : {}),
       })),
       taskRequirements: (raw.taskRequirements ?? []).map((requirement) => ({
         status: requirement.status ?? [],
@@ -129,11 +183,13 @@ export async function fetchTasksFromJson(options: FetchTasksFromJsonOptions = {}
   const fetchImpl = options.fetchImpl ?? fetch;
   const urlFor = (file: string): string => `${TARKOV_DEV_JSON_BASE_URL}/${gameMode}/${file}`;
 
-  const [tasksData, tasksEn, tradersEn, mapsEn] = await Promise.all([
+  const [tasksData, tasksEn, tradersEn, mapsEn, itemsEn] = await Promise.all([
     getData(fetchImpl, urlFor("tasks")),
     getData(fetchImpl, urlFor("tasks_en")),
     getData(fetchImpl, urlFor("traders_en")),
     getData(fetchImpl, urlFor("maps_en")),
+    // Item names make the "what to bring" lists possible; the rest works without them, so a failure here isn't fatal.
+    getData(fetchImpl, urlFor("items_en")).catch(() => null),
   ]);
 
   const tasksUrl = urlFor("tasks");
@@ -144,5 +200,6 @@ export async function fetchTasksFromJson(options: FetchTasksFromJsonOptions = {}
     tasksEn: expectRecord(tasksEn, urlFor("tasks_en")) as Translations,
     tradersEn: expectRecord(tradersEn, urlFor("traders_en")) as Translations,
     mapsEn: expectRecord(mapsEn, urlFor("maps_en")) as Translations,
+    itemsEn: itemsEn ? (expectRecord(itemsEn, urlFor("items_en")) as Translations) : undefined,
   });
 }

@@ -64,6 +64,10 @@ async function fetchFreshTasks(gameMode: GameMode, fetchImpl?: typeof fetch): Pr
   }
 }
 
+function hasItemData(tasks: TarkovTask[]): boolean {
+  return tasks.some((task) => task.objectives.some((objective) => objective.bring !== undefined));
+}
+
 /**
  * Returns the current task graph for one game mode (PvE by default),
  * preferring a fresh local cache over a network call. If the cache is
@@ -81,7 +85,8 @@ export async function syncTaskGraph(cachePath: string, options: SyncOptions = {}
   const loaded = loadCache(cachePath);
   const cached = loaded && loaded.gameMode === gameMode ? loaded : null;
 
-  if (cached && !isStale(cached.fetchedAt, maxAgeMs, now)) {
+  // A saved copy from before the "what to bring" lists existed is refreshed once, even if it's recent.
+  if (cached && !isStale(cached.fetchedAt, maxAgeMs, now) && hasItemData(cached.tasks)) {
     return cached.tasks;
   }
 

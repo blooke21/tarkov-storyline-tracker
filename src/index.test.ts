@@ -2,13 +2,14 @@ import { describe, it, expect, afterEach } from "vitest";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { syncTaskGraph, deriveStorylines, ProgressStore, convertJsonFeed, loadCache } from "./index.js";
+import { syncTaskGraph, deriveStorylines, ProgressStore, convertJsonFeed, loadCache, saveCache } from "./index.js";
 import type { TarkovTask } from "./tarkovData/types.js";
 import { jsonFeedSample } from "./tarkovData/__fixtures__/jsonFeedSample.js";
 import { createFakeFeedFetch } from "./tarkovData/__fixtures__/fakeFeedFetch.js";
 
 // What a successful JSON-feed sync should return for the real captured sample.
-const expectedTasks = convertJsonFeed(jsonFeedSample);
+// What a real fetch produces: the fake serves an (empty) item-name file, so objectives carry an empty "bring" list.
+const expectedTasks = convertJsonFeed({ ...jsonFeedSample, itemsEn: {} });
 
 // A GraphQL-shaped task list, for the fallback path.
 const graphqlTasks: TarkovTask[] = [
@@ -189,5 +190,31 @@ describe("end-to-end composition", () => {
     }
     expect(store.getStatus("597a0e5786f77426d66c0636")).toBe("accepted");
     store.close();
+  });
+});
+
+describe("syncTaskGraph and the 'what to bring' data", () => {
+  it("refreshes a recent saved copy that predates the item lists, once, then trusts the new one", async () => {
+    const cachePath = newCachePath();
+    // A copy saved by an older version: fresh, but its objectives have no "bring" field.
+    saveCache(cachePath, convertJsonFeed(jsonFeedSample), new Date(), "pve");
+    const fake = createFakeFeedFetch();
+
+    const first = await syncTaskGraph(cachePath, { fetchImpl: fake.fetchImpl });
+    const second = await syncTaskGraph(cachePath, { fetchImpl: fake.fetchImpl });
+
+    expect(fake.jsonSyncCount()).toBe(1);
+    expect(first.every((t) => t.objectives.every((o) => Array.isArray(o.bring)))).toBe(true);
+    expect(second).toEqual(first);
+  });
+
+  it("keeps using the older saved copy if that refresh can't happen", async () => {
+    const cachePath = newCachePath();
+    saveCache(cachePath, convertJsonFeed(jsonFeedSample), new Date(), "pve");
+    const fake = createFakeFeedFetch({ jsonStatus: 503 });
+
+    const tasks = await syncTaskGraph(cachePath, { fetchImpl: fake.fetchImpl });
+
+    expect(tasks).toEqual(convertJsonFeed(jsonFeedSample));
   });
 });
