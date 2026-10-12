@@ -421,6 +421,10 @@ function taskLine(task) {
 
 // "Working on now" for the selected quest line: the quests the player has
 // accepted, with what's left to do, and what they can start next.
+// Quest lines that are far too big to browse whole (every trader quest): opening one lists only the quests
+// the player has accepted. The rest are still in the full list and under "All" in the Quest line filter.
+const ACCEPTED_ONLY_LINES = new Set(["side-quests"]);
+
 function renderFocus() {
   const panel = document.getElementById("focus-panel");
   const id = selectedStoryline();
@@ -433,6 +437,27 @@ function renderFocus() {
 
   const tasks = state.tasks.filter((t) => t.storylineIds.includes(id));
   const working = tasks.filter((t) => t.status === "accepted");
+
+  if (ACCEPTED_ONLY_LINES.has(id)) {
+    // The list below is the whole story here: just the accepted quests.
+    panel.replaceChildren(
+      el(
+        "div",
+        { className: "focus-head" },
+        el("h2", {}, `${storyline.name} — ${working.length} accepted`),
+        el("button", { type: "button", className: "button", onclick: () => selectStoryline("") }, "✕ Show all quests")
+      ),
+      el(
+        "p",
+        { className: "hint" },
+        working.length === 0
+          ? "You haven't accepted any side quests yet. They show up here as soon as you accept one from a trader."
+          : "Only the side quests you've accepted are shown. Quests you haven't accepted yet, and finished ones, are hidden."
+      )
+    );
+    return;
+  }
+
   const available = tasks.filter((t) => t.actionable && t.status !== "accepted" && t.status !== "completed");
   const MAX_AVAILABLE = 8;
 
@@ -523,6 +548,7 @@ function renderTasks() {
 
   const filtered = state.tasks.filter((task) => {
     if (storylineFilter && !task.storylineIds.includes(storylineFilter)) return false;
+    if (ACCEPTED_ONLY_LINES.has(storylineFilter) && task.status !== "accepted") return false;
     if (traderFilter && task.trader !== traderFilter) return false;
     if (mapFilter && task.map !== mapFilter) return false;
     if (actionableOnly && !(task.actionable && task.status !== "completed")) return false;
