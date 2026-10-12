@@ -68,6 +68,7 @@ function showQuest(taskId) {
   }
   document.getElementById("filter-actionable").checked = false;
   document.getElementById("filter-hide-completed").checked = false;
+  document.getElementById("filter-accepted").checked = false; // not remembered: it's only for this jump
   renderStorylines(state.storylines);
   renderFocus();
   renderTasks();
@@ -421,9 +422,14 @@ function taskLine(task) {
 
 // "Working on now" for the selected quest line: the quests the player has
 // accepted, with what's left to do, and what they can start next.
-// Quest lines that are far too big to browse whole (every trader quest): opening one lists only the quests
-// the player has accepted. The rest are still in the full list and under "All" in the Quest line filter.
-const ACCEPTED_ONLY_LINES = new Set(["side-quests"]);
+// "Accepted only" (on unless the player turns it off) limits the quest list to quests they have accepted.
+function acceptedOnly() {
+  return document.getElementById("filter-accepted").checked;
+}
+
+// Lines that are far too big to browse whole (every trader quest) get a short panel instead of the long
+// "available to start" list while "Accepted only" is on: the accepted quests are the list below.
+const COMPACT_LINES = new Set(["side-quests"]);
 
 function renderFocus() {
   const panel = document.getElementById("focus-panel");
@@ -438,7 +444,7 @@ function renderFocus() {
   const tasks = state.tasks.filter((t) => t.storylineIds.includes(id));
   const working = tasks.filter((t) => t.status === "accepted");
 
-  if (ACCEPTED_ONLY_LINES.has(id)) {
+  if (COMPACT_LINES.has(id) && acceptedOnly()) {
     // The list below is the whole story here: just the accepted quests.
     panel.replaceChildren(
       el(
@@ -548,7 +554,7 @@ function renderTasks() {
 
   const filtered = state.tasks.filter((task) => {
     if (storylineFilter && !task.storylineIds.includes(storylineFilter)) return false;
-    if (ACCEPTED_ONLY_LINES.has(storylineFilter) && task.status !== "accepted") return false;
+    if (acceptedOnly() && task.status !== "accepted") return false;
     if (traderFilter && task.trader !== traderFilter) return false;
     if (mapFilter && task.map !== mapFilter) return false;
     if (actionableOnly && !(task.actionable && task.status !== "completed")) return false;
@@ -558,6 +564,15 @@ function renderTasks() {
 
   const container = document.getElementById("tasks");
   container.innerHTML = "";
+  if (filtered.length === 0 && acceptedOnly()) {
+    container.append(
+      el(
+        "p",
+        { className: "hint" },
+        "No quests you've accepted match these filters. Untick \"Accepted only\" to see quests you haven't accepted yet."
+      )
+    );
+  }
   for (const task of filtered) {
     const card = document.createElement("div");
     card.className = "task-card" + (task.status === "completed" ? " completed" : "");
@@ -595,6 +610,25 @@ function renderTasks() {
 for (const id of ["filter-trader", "filter-map", "filter-actionable", "filter-hide-completed"]) {
   document.getElementById(id).addEventListener("change", renderTasks);
 }
+
+// "Accepted only" is on by default and the player's choice is remembered in this browser.
+const ACCEPTED_ONLY_KEY = "tarkovTracker.acceptedOnly";
+try {
+  if (localStorage.getItem(ACCEPTED_ONLY_KEY) === "off") {
+    document.getElementById("filter-accepted").checked = false;
+  }
+} catch {
+  // Storage unavailable: stays on.
+}
+document.getElementById("filter-accepted").addEventListener("change", (event) => {
+  try {
+    localStorage.setItem(ACCEPTED_ONLY_KEY, event.target.checked ? "on" : "off");
+  } catch {
+    // Not remembered; fine.
+  }
+  renderFocus();
+  renderTasks();
+});
 // Choosing a quest line from the dropdown does the same as clicking its card.
 document.getElementById("filter-storyline").addEventListener("change", (event) => selectStoryline(event.target.value));
 
