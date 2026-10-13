@@ -1,5 +1,9 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { ProgressStore } from "./store.js";
+import Database from "better-sqlite3";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 let store: ProgressStore | undefined;
 
@@ -117,5 +121,106 @@ describe("ProgressStore wipe boundary", () => {
     store.setMeta("progressSince", "not a date");
 
     expect(store.getProgressSince()).toBeNull();
+  });
+});
+
+describe("ProgressStore game modes", () => {
+  it("keeps each mode's quest progress separate", () => {
+    const store = new ProgressStore(":memory:");
+    store.recordEvent("quest-a", "completed");
+
+    const pvp = store.forMode("regular");
+    const season = store.forMode("pvp-season");
+    pvp.recordEvent("quest-a", "failed");
+    season.recordEvent("quest-b", "accepted");
+
+    expect(store.getStatus("quest-a")).toBe("completed");
+    expect(pvp.getStatus("quest-a")).toBe("failed");
+    expect(season.getStatus("quest-a")).toBeNull();
+    expect([...season.getAllStatuses()]).toEqual([["quest-b", "accepted"]]);
+    expect(store.getStatus("quest-b")).toBeNull();
+    store.close();
+  });
+
+  it("switches what a store looks at with setMode, so one shared object can follow the toggle", () => {
+    const store = new ProgressStore(":memory:");
+    store.forMode("regular").recordEvent("quest-a", "completed");
+
+    expect(store.getStatus("quest-a")).toBeNull();
+    store.setMode("regular");
+    expect(store.mode).toBe("regular");
+    expect(store.getStatus("quest-a")).toBe("completed");
+    store.close();
+  });
+
+  it("keeps things like the reset boundary, chapters and pins per mode, and shares the watcher's own bookkeeping", () => {
+    const store = new ProgressStore(":memory:");
+    const pvp = store.forMode("regular");
+    store.setMeta("pinnedTasks", '["a"]');
+    pvp.setMeta("pinnedTasks", '["b"]');
+    pvp.resetProgress(new Date("2026-10-01T00:00:00Z"));
+    store.setMeta("lastWatcherPollAt", "2026-10-12T12:00:00.000Z");
+
+    expect(store.getMeta("pinnedTasks")).toBe('["a"]');
+    expect(pvp.getMeta("pinnedTasks")).toBeNull(); // PvP's reset cleared PvP's pins only
+    expect(store.getProgressSince()).toBeNull();
+    expect(pvp.getProgressSince()).toEqual(new Date("2026-10-01T00:00:00Z"));
+    expect(pvp.getMeta("lastWatcherPollAt")).toBe("2026-10-12T12:00:00.000Z");
+    store.close();
+  });
+
+  it("resetting one mode leaves the others' quests alone", () => {
+    const store = new ProgressStore(":memory:");
+    const season = store.forMode("pvp-season");
+    store.recordEvent("quest-a", "completed");
+    season.recordEvent("quest-a", "completed");
+
+    season.resetProgress(new Date());
+
+    expect(store.getStatus("quest-a")).toBe("completed");
+    expect(season.getStatus("quest-a")).toBeNull();
+    store.close();
+  });
+
+  it("closing a view leaves the shared database open", () => {
+    const store = new ProgressStore(":memory:");
+    store.forMode("regular").close();
+
+    expect(() => store.recordEvent("quest-a", "accepted")).not.toThrow();
+    store.close();
+  });
+});
+
+describe("ProgressStore upgrading a database from before game modes", () => {
+  it("treats everything already saved as PvE, including its reset boundary", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tarkov-migrate-test-"));
+    const path = join(dir, "old.sqlite");
+    try {
+      const old = new Database(path);
+      old.exec(`
+        CREATE TABLE task_progress (task_id TEXT PRIMARY KEY, status TEXT NOT NULL CHECK(status IN ('accepted', 'completed', 'failed')), updated_at TEXT NOT NULL);
+        CREATE TABLE store_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        INSERT INTO task_progress VALUES ('quest-a', 'completed', '2026-10-10T15:00:00.000Z'), ('quest-b', 'accepted', '2026-10-10T15:05:00.000Z');
+        INSERT INTO store_meta VALUES ('progressSince', '2026-10-10T15:13:23.000Z'), ('prestigeProgress', '{"level":1,"done":[]}');
+      `);
+      old.close();
+
+      const store = new ProgressStore(path);
+
+      expect(store.getAllStatuses().size).toBe(2);
+      expect(store.getStatus("quest-a")).toBe("completed");
+      expect(store.getProgressSince()).toEqual(new Date("2026-10-10T15:13:23.000Z"));
+      expect(store.getMeta("prestigeProgress")).toBe('{"level":1,"done":[]}');
+      expect(store.forMode("regular").getAllStatuses().size).toBe(0);
+      expect(store.forMode("regular").getMeta("prestigeProgress")).toBeNull();
+
+      store.recordEvent("quest-c", "failed");
+      store.close();
+      const reopened = new ProgressStore(path);
+      expect(reopened.getAllStatuses().size).toBe(3);
+      reopened.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

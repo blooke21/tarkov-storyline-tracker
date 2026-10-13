@@ -12,7 +12,8 @@ const REQUEST_TIMEOUT_MS = 30_000;
 
 function tasksQuery(gameMode: GameMode): string {
   // gameMode is a GraphQL enum (unquoted) and is a closed union type, so it
-  // can't carry anything but "pve" or "regular" into the query text.
+  // can't carry anything but a known mode id into the query text. (The API only
+  // knows "pve" and "regular"; fetchTasks refuses the seasonal mode.)
   return `
   query GetTasks {
     tasks(lang: en, gameMode: ${gameMode}) {
@@ -41,6 +42,9 @@ export async function fetchTasks(
   fetchImpl: typeof fetch = fetch,
   gameMode: GameMode = DEFAULT_GAME_MODE
 ): Promise<TarkovTask[]> {
+  if (gameMode === "pvp-season") {
+    throw new Error("the GraphQL API has no PvP Season quest data");
+  }
   const response = await fetchImpl(TARKOV_DEV_GRAPHQL_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

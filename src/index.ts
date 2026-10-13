@@ -2,7 +2,7 @@ export type { TarkovTrader, TarkovMap, TaskObjective, TaskStatusRequirement, Tar
 export { fetchTasks, TARKOV_DEV_GRAPHQL_URL } from "./tarkovData/client.js";
 export { fetchTasksFromJson, convertJsonFeed, TARKOV_DEV_JSON_BASE_URL } from "./tarkovData/jsonClient.js";
 export type { JsonFeed, FetchTasksFromJsonOptions } from "./tarkovData/jsonClient.js";
-export { DEFAULT_GAME_MODE, parseGameMode } from "./tarkovData/gameMode.js";
+export { DEFAULT_GAME_MODE, GAME_MODES, GAME_MODE_LABELS, isGameMode, parseGameMode } from "./tarkovData/gameMode.js";
 export type { GameMode } from "./tarkovData/gameMode.js";
 export { saveCache, loadCache, isStale, CACHE_VERSION } from "./tarkovData/cache.js";
 export type { TaskCache } from "./tarkovData/cache.js";

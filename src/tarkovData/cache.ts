@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { DEFAULT_GAME_MODE, type GameMode } from "./gameMode.js";
+import { DEFAULT_GAME_MODE, isGameMode, type GameMode } from "./gameMode.js";
 import type { TarkovTask } from "./types.js";
 
 // Version 2 added `gameMode`. Bumping the version is what makes an existing
@@ -42,7 +42,7 @@ export function loadCache(cachePath: string): TaskCache | null {
   const cache = parsed as Partial<TaskCache>;
   if (
     cache.version !== CACHE_VERSION ||
-    (cache.gameMode !== "pve" && cache.gameMode !== "regular") ||
+    !isGameMode(cache.gameMode) ||
     typeof cache.fetchedAt !== "string" ||
     !Array.isArray(cache.tasks)
   ) {

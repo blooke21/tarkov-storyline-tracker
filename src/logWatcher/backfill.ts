@@ -1,5 +1,6 @@
 import { listSessionFolders } from "./discovery.js";
 import { applySessionToStore } from "./applySession.js";
+import type { ApplySessionOptions } from "./applySession.js";
 import type { ProgressStore } from "../progress/store.js";
 
 export interface BackfillResult {
@@ -8,14 +9,14 @@ export interface BackfillResult {
   raidEventsSeen: number;
 }
 
-export function runBackfill(logsRootDir: string, store: ProgressStore): BackfillResult {
+export function runBackfill(logsRootDir: string, store: ProgressStore, options: ApplySessionOptions = {}): BackfillResult {
   const sessions = listSessionFolders(logsRootDir);
   let taskEventsApplied = 0;
   let raidEventsSeen = 0;
 
   for (const session of sessions) {
     try {
-      const result = applySessionToStore(session.path, store);
+      const result = applySessionToStore(session.path, store, options);
       taskEventsApplied += result.taskEventsApplied;
       raidEventsSeen += result.raidEventsSeen;
     } catch {

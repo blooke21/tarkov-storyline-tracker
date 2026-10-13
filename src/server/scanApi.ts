@@ -73,7 +73,7 @@ export function scanLogs(deps: ScanDeps): ScanReport {
 
   const after = deps.store.getAllStatuses();
   const since = deps.store.getProgressSince();
-  const events = collectTaskEvents(deps.logsRootDir);
+  const events = collectTaskEvents(deps.logsRootDir, { mode: deps.store.mode });
   const counted = since ? events.filter((event) => event.occurredAt >= since) : events;
 
   const fromLogs = new Set(counted.map((event) => event.taskId));

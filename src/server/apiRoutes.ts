@@ -15,7 +15,7 @@ import { buildBringResponse } from "./bringApi.js";
 import { buildOperationalResponse } from "./operationalApi.js";
 import { buildPrestigeResponse, setPrestigeCondition, setPrestigeLevel } from "./prestigeApi.js";
 import type { PrestigeLevel } from "../prestige/prestigeData.js";
-import type { GameMode } from "../tarkovData/gameMode.js";
+import { GAME_MODES, GAME_MODE_LABELS, isGameMode, type GameMode } from "../tarkovData/gameMode.js";
 import type { QuestGuide } from "../wiki/questGuide.js";
 import { buildWipeOptions, buildWipePreview, performWipe, parseSince } from "./wipeApi.js";
 
@@ -32,6 +32,10 @@ export interface ApiDeps {
   getPrestige?: () => PrestigeLevel[];
   /** Which game mode's quests and prestige rules are in use. Defaults to PvE. */
   gameMode?: GameMode;
+  /** The mode on screen right now (it can change while the app runs). Takes the place of `gameMode`. */
+  getGameMode?: () => GameMode;
+  /** Switches the mode on screen: loads that mode's quest data and points the store at its progress. */
+  switchMode?: (mode: GameMode) => Promise<void>;
   /** Where the game's logs are read from, for the dashboard to show if they can't be found. */
   logsFolder?: LogsFolderInfo;
   /** The wiki's walkthrough for a quest, by quest id: null for an unknown quest, throws if the wiki can't be reached. */
@@ -54,11 +58,14 @@ function requireTrackerHeader(req: { headers: Record<string, string | string[] |
 export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
   const wipeDeps = { store: deps.store, logsRootDir: deps.logsRootDir, getTasks: deps.getTasks };
   const chapterDeps = { store: deps.store, chapters: deps.chapters ?? STORY_CHAPTERS };
+  const currentMode = (): GameMode => deps.getGameMode?.() ?? deps.gameMode ?? "pve";
   const prestigeDeps = {
     store: deps.store,
     getTasks: deps.getTasks,
     getLevels: deps.getPrestige ?? (() => []),
-    gameMode: deps.gameMode,
+    get gameMode() {
+      return currentMode();
+    },
     getChapter: (chapterId: string) => {
       const chapter = buildChaptersResponse(chapterDeps).chapters.find((candidate) => candidate.id === chapterId);
       return chapter ? { name: chapter.name, done: chapter.status === "done" } : undefined;
@@ -66,7 +73,24 @@ export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
   };
 
   return {
-    "GET /api/status": () => buildStatusResponse(deps.getCache(), deps.store, deps.logsFolder ?? null, deps.gameMode ?? "pve"),
+    "GET /api/status": () => buildStatusResponse(deps.getCache(), deps.store, deps.logsFolder ?? null, currentMode()),
+    "POST /api/mode": async (url, req) => {
+      requireTrackerHeader(req);
+      const mode = url.searchParams.get("mode");
+      if (!isGameMode(mode)) {
+        throw new HttpError(400, `mode must be one of ${GAME_MODES.join(", ")}`);
+      }
+      if (!deps.switchMode) {
+        throw new HttpError(404, "Switching mode isn't available");
+      }
+      try {
+        await deps.switchMode(mode);
+      } catch (error) {
+        throw new HttpError(502, `Couldn't load ${GAME_MODE_LABELS[mode]} quest data (${error instanceof Error ? error.message : "unknown error"})`);
+      }
+      return { gameMode: currentMode() };
+    },
+
     "GET /api/progress": () => buildProgressResponse(deps.getTasks(), deps.getStorylines(), deps.store),
     "GET /api/tasks": (url) =>
       buildTasksResponse(deps.getTasks(), deps.getStorylines(), deps.store, {

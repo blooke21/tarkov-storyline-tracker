@@ -77,7 +77,7 @@ function suggestStart(events: TaskLogEvent[]): Date | null {
 
 export function buildWipeOptions(deps: WipeApiDeps, recentLimit = 15): WipeOptionsResponse {
   const nameOf = nameLookup(deps.getTasks());
-  const recent = collectTaskEvents(deps.logsRootDir).slice(-recentLimit);
+  const recent = collectTaskEvents(deps.logsRootDir, { mode: deps.store.mode }).slice(-recentLimit);
 
   return {
     progressSince: deps.store.getProgressSince()?.toISOString() ?? null,
@@ -95,7 +95,7 @@ export function buildWipeOptions(deps: WipeApiDeps, recentLimit = 15): WipeOptio
 /** What a wipe from `since` would do — computed without changing anything. */
 export function buildWipePreview(deps: WipeApiDeps, since: Date): WipePreviewResponse {
   const nameOf = nameLookup(deps.getTasks());
-  const kept = collectTaskEvents(deps.logsRootDir).filter((event) => event.occurredAt >= since);
+  const kept = collectTaskEvents(deps.logsRootDir, { mode: deps.store.mode }).filter((event) => event.occurredAt >= since);
 
   const latestByTask = new Map<string, TaskStatus>();
   for (const event of kept) {

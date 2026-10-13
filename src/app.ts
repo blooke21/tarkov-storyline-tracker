@@ -20,6 +20,7 @@ import type { TarkovTask, TaskCache, GameMode } from "./index.js";
 import { createServer } from "./server/createServer.js";
 import { createApiRoutes } from "./server/apiRoutes.js";
 import { findRunningTracker, openBrowser, shouldOpenBrowser } from "./launcher.js";
+import { DEFAULT_GAME_MODE, GAME_MODE_LABELS, isGameMode } from "./tarkovData/gameMode.js";
 
 export interface AppConfig {
   port?: number;
@@ -29,7 +30,7 @@ export interface AppConfig {
   staticDir?: string;
   fetchImpl?: typeof fetch;
   pollIntervalMs?: number;
-  /** Which game mode's quests to track. Defaults to the TARKOV_GAME_MODE env var, then PvE. */
+  /** Which game mode to show. Defaults to the TARKOV_GAME_MODE env var, then the mode last viewed, then PvE. */
   gameMode?: GameMode;
   /** Where the prestige requirements are cached. Defaults to the project folder. */
   prestigeCachePath?: string;
@@ -61,10 +62,16 @@ const DEFAULT_PORT = Number.isInteger(PORT_FROM_ENV) && PORT_FROM_ENV > 0 && POR
 // and web files no matter which folder a desktop shortcut starts it from.
 const PROJECT_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
+/** The saved-data file for a mode: PvE keeps the original name, the others get the mode in it (cache.json -> cache-regular.json). */
+function pathForMode(path: string, mode: GameMode): string {
+  return mode === DEFAULT_GAME_MODE ? path : path.replace(/(\.json)?$/, `-${mode}$1`);
+}
+
 export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
-  // Resolved first so an invalid TARKOV_GAME_MODE fails before any real work
-  // (network, database, log reading) happens.
-  const gameMode = config.gameMode ?? parseGameMode(process.env.TARKOV_GAME_MODE);
+  // An explicit choice (config, or TARKOV_GAME_MODE) is resolved first so an invalid one fails before any
+  // real work (network, database, log reading) happens. Otherwise the mode the player last viewed is used.
+  const envMode = process.env.TARKOV_GAME_MODE?.trim() ? parseGameMode(process.env.TARKOV_GAME_MODE) : undefined;
+  const explicitMode: GameMode | undefined = config.gameMode ?? envMode;
   const port = config.port ?? DEFAULT_PORT;
   // Saved progress and downloaded data live in the project folder unless TARKOV_DATA_DIR points elsewhere
   // (handy for trying things out without touching your real progress).
@@ -75,36 +82,65 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
     ? { dir: config.logsRootDir, found: existsSync(config.logsRootDir), source: "TARKOV_LOGS_DIR", tried: [config.logsRootDir] }
     : findLogsDir({ dataDir });
   const logsRootDir = logs.dir;
-  const cachePath = config.cachePath ?? join(dataDir, ".tarkov-cache.json");
+  const cacheBase = config.cachePath ?? join(dataDir, ".tarkov-cache.json");
+  const prestigeCacheBase = config.prestigeCachePath ?? join(dataDir, ".tarkov-prestige-cache.json");
   const dbPath = config.dbPath ?? join(dataDir, ".tarkov-progress.sqlite");
   const staticDir = config.staticDir ?? join(PROJECT_ROOT, "public");
 
-  const prestigeCachePath = config.prestigeCachePath ?? join(dataDir, ".tarkov-prestige-cache.json");
-  let tasks: TarkovTask[] = await syncTaskGraph(cachePath, { fetchImpl: config.fetchImpl, gameMode });
-  let prestigeLevels = config.prestigeLevels ?? (await syncPrestige(prestigeCachePath, { fetchImpl: config.fetchImpl, gameMode }));
-
   const store = new ProgressStore(dbPath);
+  const remembered = store.getMeta("viewMode");
+  const initialMode: GameMode = explicitMode ?? (isGameMode(remembered) ? remembered : DEFAULT_GAME_MODE);
+  store.setMode(initialMode);
+
+  // One mode's quest data and prestige requirements (from a saved copy or the network).
+  const loadModeData = async (mode: GameMode): Promise<{ tasks: TarkovTask[]; prestigeLevels: PrestigeLevel[] }> => ({
+    tasks: await syncTaskGraph(pathForMode(cacheBase, mode), { fetchImpl: config.fetchImpl, gameMode: mode }),
+    prestigeLevels: config.prestigeLevels ?? (await syncPrestige(pathForMode(prestigeCacheBase, mode), { fetchImpl: config.fetchImpl, gameMode: mode })),
+  });
+  const current = { mode: initialMode, tasks: [] as TarkovTask[], prestigeLevels: [] as PrestigeLevel[] };
+  try {
+    Object.assign(current, await loadModeData(initialMode));
+  } catch (error) {
+    store.close();
+    throw error;
+  }
+
   // Quest walkthroughs are fetched from the wiki the first time a quest's guide is opened, then kept on disk.
   const questGuides = createQuestGuideService({ cacheDir: join(dataDir, ".tarkov-wiki-cache") });
 
-  runBackfill(logsRootDir, store);
+  // Quest messages are filed under the mode they happened in, whichever mode is on screen; the fallback is for
+  // a message whose mode the logs can't tell.
+  const fallbackMode = explicitMode ?? DEFAULT_GAME_MODE;
+  runBackfill(logsRootDir, store, { fallbackMode });
 
-  const tailer = new LogTailer(logsRootDir, store, { pollIntervalMs: config.pollIntervalMs });
+  const tailer = new LogTailer(logsRootDir, store, { pollIntervalMs: config.pollIntervalMs, fallbackMode });
   tailer.start();
 
-  const getCache = (): TaskCache | null => loadCache(cachePath);
-  const getStorylines = () => deriveStorylines(tasks);
+  const getCache = (): TaskCache | null => loadCache(pathForMode(cacheBase, current.mode));
+  const getStorylines = () => deriveStorylines(current.tasks);
   const routes = createApiRoutes({
     store,
     getCache,
-    getTasks: () => tasks,
+    getTasks: () => current.tasks,
     getStorylines,
     logsRootDir,
-    getPrestige: () => prestigeLevels,
-    gameMode,
+    getPrestige: () => current.prestigeLevels,
+    getGameMode: () => current.mode,
+    switchMode: async (mode) => {
+      if (mode === current.mode) {
+        return;
+      }
+      // Load the other mode's data first: if that fails, nothing has changed.
+      const data = await loadModeData(mode);
+      current.tasks = data.tasks;
+      current.prestigeLevels = data.prestigeLevels;
+      current.mode = mode;
+      store.setMode(mode);
+      store.setMeta("viewMode", mode);
+    },
     logsFolder: { path: logs.dir, found: logs.found, source: logs.source, tried: logs.tried, settingsFile: join(dataDir, "settings.json") },
     getQuestGuide: async (taskId) => {
-      const task = tasks.find((candidate) => candidate.id === taskId);
+      const task = current.tasks.find((candidate) => candidate.id === taskId);
       return task ? questGuides.get(task.wikiLink) : null;
     },
   });
@@ -138,19 +174,20 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
     throw error;
   }
 
-  // Quest data (and prestige requirements) are checked again every few hours, so a tracker left open
-  // across a game update or new quests keeps up. A failed refresh keeps what it has.
+  // Quest data (and prestige requirements) for the mode on screen are checked again every few hours, so a tracker
+  // left open across a game update or new quests keeps up. A failed refresh keeps what it has.
   const refreshMs = config.refreshIntervalMs ?? DEFAULT_REFRESH_MS;
   const refresh = setInterval(() => {
-    syncTaskGraph(cachePath, { fetchImpl: config.fetchImpl, gameMode, maxAgeMs: refreshMs })
+    const mode = current.mode;
+    syncTaskGraph(pathForMode(cacheBase, mode), { fetchImpl: config.fetchImpl, gameMode: mode, maxAgeMs: refreshMs })
       .then((fresh) => {
-        tasks = fresh;
+        if (current.mode === mode) current.tasks = fresh;
       })
       .catch(() => undefined);
     if (!config.prestigeLevels) {
-      syncPrestige(prestigeCachePath, { fetchImpl: config.fetchImpl, gameMode, maxAgeMs: refreshMs })
+      syncPrestige(pathForMode(prestigeCacheBase, mode), { fetchImpl: config.fetchImpl, gameMode: mode, maxAgeMs: refreshMs })
         .then((fresh) => {
-          if (fresh.length > 0) prestigeLevels = fresh;
+          if (fresh.length > 0 && current.mode === mode) current.prestigeLevels = fresh;
         })
         .catch(() => undefined);
     }
@@ -158,7 +195,15 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
   refresh.unref();
   server.on("close", () => clearInterval(refresh));
 
-  return { server, store, tailer, gameMode, logs };
+  return {
+    server,
+    store,
+    tailer,
+    logs,
+    get gameMode() {
+      return current.mode;
+    },
+  };
 }
 
 // pathToFileURL (not manual string/URL construction) is the Node-documented
@@ -185,8 +230,7 @@ async function main(): Promise<void> {
   const address = app.server.address();
   const port = typeof address === "object" && address ? address.port : DEFAULT_PORT;
   const url = `http://127.0.0.1:${port}`;
-  const modeLabel = app.gameMode === "pve" ? "PvE" : "regular";
-  console.log(`Tarkov Storyline Tracker running at ${url} (${modeLabel} quests)`);
+  console.log(`Tarkov Storyline Tracker running at ${url} (${GAME_MODE_LABELS[app.gameMode]} quests)`);
   if (app.logs.found) {
     console.log(`Reading your game logs from ${app.logs.dir} (found via ${app.logs.source}).`);
   } else {

@@ -22,6 +22,11 @@ describe("buildStatusResponse", () => {
       progressSince: null,
       logsFolder: null,
       gameMode: null,
+      availableModes: [
+        { id: "pve", label: "PvE" },
+        { id: "regular", label: "PvP" },
+        { id: "pvp-season", label: "PvP Season" },
+      ],
     });
   });
 
@@ -38,6 +43,11 @@ describe("buildStatusResponse", () => {
       progressSince: null,
       logsFolder: null,
       gameMode: null,
+      availableModes: [
+        { id: "pve", label: "PvE" },
+        { id: "regular", label: "PvP" },
+        { id: "pvp-season", label: "PvP Season" },
+      ],
     });
   });
 

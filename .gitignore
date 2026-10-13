@@ -7,3 +7,6 @@ dist/
 *.tmp
 .tarkov-wiki-cache/
 release/
+.tarkov-cache*.json
+.tarkov-prestige-cache*.json
+*.sqlite.backup*

@@ -101,7 +101,7 @@
         el(
           "p",
           { className: "hint" },
-          "Couldn't load the prestige requirements (the quest data site may be unreachable). Restart the tracker while online to try again."
+          "There are no prestige requirements to show for this mode: either it has no prestige (PvP Season doesn't), or they couldn't be downloaded just now (restart the tracker while online to try again)."
         )
       );
     } else {

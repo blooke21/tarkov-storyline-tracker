@@ -770,3 +770,39 @@ header .reset-panel {
 .page-note strong {
   color: var(--text);
 }
+
+/* PvE / PvP / PvP Season switch in the header */
+.mode-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+
+.mode-button {
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.95rem;
+  cursor: pointer;
+}
+
+.mode-button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.mode-button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0f1115;
+  font-weight: 600;
+  cursor: default;
+}
+
+.mode-button:disabled:not(.active) {
+  opacity: 0.5;
+}

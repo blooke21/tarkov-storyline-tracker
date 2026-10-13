@@ -11,9 +11,10 @@ describe("parseGameMode", () => {
     expect(parseGameMode("")).toBe("pve");
   });
 
-  it("accepts pve and regular", () => {
+  it("accepts pve, regular and pvp-season", () => {
     expect(parseGameMode("pve")).toBe("pve");
     expect(parseGameMode("regular")).toBe("regular");
+    expect(parseGameMode("pvp-season")).toBe("pvp-season");
   });
 
   it("is case-insensitive and ignores surrounding whitespace", () => {
@@ -21,7 +22,7 @@ describe("parseGameMode", () => {
     expect(parseGameMode("REGULAR")).toBe("regular");
   });
 
-  it("throws a clear error for anything else rather than silently falling back", () => {
-    expect(() => parseGameMode("pvp")).toThrow(/TARKOV_GAME_MODE.*"pve".*"regular".*"pvp"/);
+  it("throws a clear error for anything else rather than silently falling back (a bare \"pvp\" is ambiguous)", () => {
+    expect(() => parseGameMode("pvp")).toThrow(/TARKOV_GAME_MODE.*"pve".*"regular".*"pvp-season".*"pvp"/);
   });
 });

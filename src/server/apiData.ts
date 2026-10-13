@@ -1,4 +1,5 @@
 import type { TarkovTask } from "../tarkovData/types.js";
+import { GAME_MODES, GAME_MODE_LABELS, type GameMode } from "../tarkovData/gameMode.js";
 import type { TaskCache } from "../tarkovData/cache.js";
 import type { Storyline } from "../storylines/deriveStorylines.js";
 import type { ProgressStore, TaskStatus } from "../progress/store.js";
@@ -13,7 +14,9 @@ export interface StatusResponse {
   /** Where the game's logs are being read from, and whether that folder exists. Null if the app wasn't told. */
   logsFolder: LogsFolderInfo | null;
   /** Which mode's quest list the tracker is showing. */
-  gameMode: "pve" | "regular" | null;
+  gameMode: GameMode | null;
+  /** The modes the player can switch between. */
+  availableModes: Array<{ id: GameMode; label: string }>;
 }
 
 export interface LogsFolderInfo {
@@ -31,7 +34,7 @@ export function buildStatusResponse(
   cache: TaskCache | null,
   store: ProgressStore,
   logsFolder: LogsFolderInfo | null = null,
-  gameMode: "pve" | "regular" | null = null
+  gameMode: GameMode | null = null
 ): StatusResponse {
   return {
     taskGraphFetchedAt: cache?.fetchedAt ?? null,
@@ -40,6 +43,7 @@ export function buildStatusResponse(
     progressSince: store.getProgressSince()?.toISOString() ?? null,
     logsFolder,
     gameMode,
+    availableModes: GAME_MODES.map((id) => ({ id, label: GAME_MODE_LABELS[id] })),
   };
 }
 

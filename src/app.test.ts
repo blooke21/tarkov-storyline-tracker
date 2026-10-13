@@ -213,6 +213,46 @@ describe("startApp", () => {
     expect(after).toBeGreaterThan(0);
   });
 
+  it("switches mode while running: loads that mode's quests, keeps its progress separate, and remembers the choice", async () => {
+    const { config, fake } = setUp();
+    app = await startApp(config);
+    app.store.recordEvent("pve-quest", "completed");
+    const post = (mode: string) =>
+      fetch(`${baseUrl(app!)}/api/mode?mode=${mode}`, { method: "POST", headers: { "X-Requested-With": "tarkov-tracker" } });
+    expect(fake.jsonSyncCount()).toBe(1);
+
+    expect((await post("pvp-season")).status).toBe(200);
+
+    expect(app.gameMode).toBe("pvp-season");
+    expect(fake.jsonSyncCount()).toBe(2); // the season's quest data was fetched for the switch
+    expect(app.store.getStatus("pve-quest")).toBeNull(); // a different character
+    app.store.recordEvent("season-quest", "accepted");
+    expect(app.store.forMode("pve").getStatus("pve-quest")).toBe("completed");
+    const status = (await (await fetch(`${baseUrl(app)}/api/status`)).json()) as { gameMode: string };
+    expect(status.gameMode).toBe("pvp-season");
+
+    // A restart (same saved data, no mode asked for) comes back to the mode that was on screen.
+    await new Promise<void>((resolve) => app!.server.close(() => resolve()));
+    app.tailer.stop();
+    app.store.close();
+    app = await startApp(config);
+    expect(app.gameMode).toBe("pvp-season");
+    expect(app.store.getStatus("season-quest")).toBe("accepted");
+  });
+
+  it("an explicit gameMode beats the remembered one", async () => {
+    const { config } = setUp();
+    app = await startApp(config);
+    app.store.setMeta("viewMode", "regular");
+    await new Promise<void>((resolve) => app!.server.close(() => resolve()));
+    app.tailer.stop();
+    app.store.close();
+
+    app = await startApp({ ...config, gameMode: "pve" });
+
+    expect(app.gameMode).toBe("pve");
+  });
+
   it("keeps its saved progress in TARKOV_DATA_DIR when that is set, leaving the project folder alone", async () => {
     const { config } = setUp();
     const dataDir = join(tempDir!, "elsewhere");

@@ -50,13 +50,20 @@ Daily and weekly operational tasks: the game only records that you finished
 one (not what it was, or when you accepted it), so the tracker shows a count
 and a list of the ones you completed.
 
-PLAYING BOTH PVE AND PVP?
--------------------------
-The game's quest messages don't say which mode they came from, so a quest you
-finish in either mode is counted, and the quest list is the PvE one (set the
-TARKOV_GAME_MODE environment variable to "regular" for the PvP list). If your
-two characters have different progress the numbers can be off; "Check & reset
-my progress" starts you clean.
+PVE, PVP AND PVP SEASON
+-----------------------
+Each mode is a separate character, so the tracker keeps a separate quest list,
+progress, pins, story chapters and prestige for each. Switch with the PvE / PvP /
+PvP Season buttons at the top of the page (the first time you open a mode it
+downloads that mode's quest data, so give it a few seconds).
+
+The game's quest messages don't say which mode they came from. The tracker works
+it out from which game server the game was talking to at that moment. That
+matched the game's own records for PvE and PvP Season; regular PvP couldn't be
+checked because it needs a PvP session to compare against. If something lands in
+the wrong mode, "Scan my logs" re-reads everything. (To start the tracker in a
+particular mode, set the TARKOV_GAME_MODE environment variable to pve, regular or
+pvp-season.)
 
 FAILED QUESTS
 -------------

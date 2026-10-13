@@ -1,12 +1,15 @@
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { ProgressStore, runBackfill } from "./index.js";
+import { ProgressStore, runBackfill, parseGameMode } from "./index.js";
+import type { GameMode } from "./index.js";
 
 export interface WipeOptions {
   dbPath: string;
   logsRootDir: string;
   /** Tracking restarts from this moment; anything logged earlier is ignored. */
   since: Date;
+  /** Which game mode's character was reset (default PvE). */
+  mode?: GameMode;
 }
 
 export interface WipeResult {
@@ -22,7 +25,7 @@ export interface WipeResult {
  * the boundary (e.g. quests accepted a minute after the reset) is not lost.
  */
 export function wipeProgress(options: WipeOptions): WipeResult {
-  const store = new ProgressStore(options.dbPath);
+  const store = new ProgressStore(options.dbPath, options.mode);
   try {
     store.resetProgress(options.since);
     const result = runBackfill(options.logsRootDir, store);
@@ -53,7 +56,9 @@ if (isMainModule) {
     const since = parseSinceArg(process.argv.slice(2));
     const dbPath = process.env.TARKOV_DB_PATH ?? join(process.cwd(), ".tarkov-progress.sqlite");
     const logsRootDir = process.env.TARKOV_LOGS_DIR ?? "C:\\Battlestate Games\\Escape from Tarkov\\Logs";
-    const result = wipeProgress({ dbPath, logsRootDir, since });
+    const modeIndex = process.argv.indexOf("--mode");
+    const mode = parseGameMode(modeIndex === -1 ? process.env.TARKOV_GAME_MODE : process.argv[modeIndex + 1]);
+    const result = wipeProgress({ dbPath, logsRootDir, since, mode });
     console.log(`Wiped. Tracking now starts from ${result.since.toLocaleString()}.`);
     console.log(`Picked up ${result.tasksPickedUp} quest event(s) logged since then.`);
     console.log("If the tracker is running, that's all — it reads the same data. Close and reopen it if the numbers look stale.");

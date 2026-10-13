@@ -119,12 +119,56 @@ function renderLogsWarning(logsFolder) {
   );
 }
 
+// The PvE / PvP / PvP Season buttons. Switching loads that mode's quest data and shows its progress, so the
+// page is simply reloaded afterwards.
+function renderModeSwitch(status) {
+  const box = document.getElementById("mode-switch");
+  if (!box || !status.availableModes || !status.gameMode) {
+    return;
+  }
+  const label = (status.availableModes.find((m) => m.id === status.gameMode) || {}).label;
+  const mode = document.getElementById("mode-label");
+  if (mode && label) {
+    mode.textContent = label;
+  }
+  box.replaceChildren(
+    ...status.availableModes.map((m) =>
+      el(
+        "button",
+        {
+          type: "button",
+          className: "mode-button" + (m.id === status.gameMode ? " active" : ""),
+          ariaPressed: m.id === status.gameMode ? "true" : "false",
+          title: m.id === status.gameMode ? `Showing ${m.label}` : `Switch to ${m.label}`,
+          disabled: m.id === status.gameMode,
+          onclick: () => switchMode(m),
+        },
+        m.label
+      )
+    )
+  );
+}
+
+async function switchMode(mode) {
+  const box = document.getElementById("mode-switch");
+  box.querySelectorAll("button").forEach((b) => (b.disabled = true));
+  box.append(el("span", { className: "hint" }, ` Loading ${mode.label} quests…`));
+  try {
+    const response = await fetch(`/api/mode?mode=${encodeURIComponent(mode.id)}`, { method: "POST", headers: TRACKER_WRITE_HEADERS });
+    if (!response.ok) {
+      throw new Error((await response.text()) || `${response.status}`);
+    }
+    location.reload();
+  } catch (error) {
+    console.error("Could not switch mode:", error);
+    alert(`Couldn't switch to ${mode.label}: ${error.message}`);
+    loadData();
+  }
+}
+
 function renderStatus(status) {
   renderLogsWarning(status.logsFolder);
-  const mode = document.getElementById("mode-label");
-  if (mode && status.gameMode) {
-    mode.textContent = status.gameMode === "regular" ? "PvP (regular)" : "PvE";
-  }
+  renderModeSwitch(status);
   const line = document.getElementById("status-line");
   const parts = [];
   parts.push(

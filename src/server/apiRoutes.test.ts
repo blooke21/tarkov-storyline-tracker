@@ -429,3 +429,71 @@ describe("pinned 'bring into raid' route over HTTP", () => {
     expect(body.quests[0].items).toEqual([{ text: "2× MS2000 Marker", note: null }]);
   });
 });
+
+describe("mode switching route over HTTP", () => {
+  async function boot(switchMode?: (mode: string) => Promise<void>) {
+    tempDir = mkdtempSync(join(tmpdir(), "tarkov-server-test-"));
+    store = new ProgressStore(":memory:");
+    let mode = "pve";
+    const routes = createApiRoutes({
+      store,
+      getCache: () => null,
+      getTasks: () => sampleTasks,
+      getStorylines: () => [],
+      logsRootDir: join(tempDir, "logs"),
+      getGameMode: () => mode as never,
+      switchMode: switchMode
+        ? async (next) => {
+            await switchMode(next);
+            mode = next;
+          }
+        : undefined,
+    });
+    server = createServer({ apiRoutes: routes, staticDir: tempDir });
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+  }
+  const post = (mode: string, headers?: Record<string, string>) => fetch(`${baseUrl()}/api/mode?mode=${mode}`, { method: "POST", headers });
+
+  it("switches mode, and the status then reports it along with the modes on offer", async () => {
+    const switched: string[] = [];
+    await boot(async (mode) => void switched.push(mode));
+
+    const status = (await (await fetch(`${baseUrl()}/api/status`)).json()) as { gameMode: string; availableModes: Array<{ id: string }> };
+    expect(status.gameMode).toBe("pve");
+    expect(status.availableModes.map((m) => m.id)).toEqual(["pve", "regular", "pvp-season"]);
+
+    const response = await post("pvp-season", TRACKER_HEADER);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ gameMode: "pvp-season" });
+    expect(switched).toEqual(["pvp-season"]);
+    expect(((await (await fetch(`${baseUrl()}/api/status`)).json()) as { gameMode: string }).gameMode).toBe("pvp-season");
+  });
+
+  it("needs the tracker header and a real mode", async () => {
+    const switched: string[] = [];
+    await boot(async (mode) => void switched.push(mode));
+
+    expect((await post("regular")).status).toBe(403);
+    expect((await post("pvp", TRACKER_HEADER)).status).toBe(400);
+    expect((await post("", TRACKER_HEADER)).status).toBe(400);
+    expect(switched).toEqual([]);
+  });
+
+  it("answers 502 with a clear message if the other mode's quest data can't be loaded, and stays where it was", async () => {
+    await boot(async () => {
+      throw new Error("offline");
+    });
+
+    const response = await post("regular", TRACKER_HEADER);
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toMatch(/PvP quest data.*offline/);
+    expect(((await (await fetch(`${baseUrl()}/api/status`)).json()) as { gameMode: string }).gameMode).toBe("pve");
+  });
+
+  it("isn't offered when the app can't switch", async () => {
+    await boot();
+
+    expect((await post("regular", TRACKER_HEADER)).status).toBe(404);
+  });
+});

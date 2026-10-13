@@ -63,7 +63,7 @@ export function findLatestSession(logsRootDir: string): SessionInfo | null {
   return sessions.length > 0 ? sessions[sessions.length - 1] : null;
 }
 
-export type LogFileKind = "application" | "pushNotifications";
+export type LogFileKind = "application" | "pushNotifications" | "backend";
 
 // Real EFT log filenames carry a timestamp+version prefix before the type
 // name (e.g. "2026.09.16_13-19-26_1.1.5.0.47426 application_000.log"), so
@@ -71,6 +71,7 @@ export type LogFileKind = "application" | "pushNotifications";
 const LOG_FILE_SUFFIXES: Record<LogFileKind, string> = {
   application: "application_000.log",
   pushNotifications: "push-notifications_000.log",
+  backend: "backend_000.log",
 };
 
 export function findLogFile(sessionDir: string, kind: LogFileKind): string | null {

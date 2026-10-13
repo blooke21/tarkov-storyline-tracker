@@ -11,6 +11,7 @@
     <div class="header-inner">
       <h1>Tarkov Storyline Tracker</h1>
       <p id="status-line" class="status-line">Loading...</p>
+      <div id="mode-switch" class="mode-switch" role="group" aria-label="Game mode"></div>
       <section id="logs-warning" class="notice warning" aria-label="Game logs not found" hidden></section>
 
       <section id="reset-help" class="notice" aria-label="Help if the numbers look wrong">
@@ -19,7 +20,7 @@
           Too many quests showing as done, or quests you just finished not showing as completed?
           That usually means you reset your character and the tracker is still counting your old one.
           &ldquo;Scan my logs&rdquo; re-reads every game log and fills in anything the tracker missed.
-          Play both PvE and PvP? See the note at the bottom of the page.
+          Play more than one mode? Use the PvE / PvP / PvP Season buttons at the top; see the note at the bottom of the page.
         </p>
         <div class="reset-actions">
           <button id="open-scan" type="button" class="button">Scan my logs</button>
@@ -82,10 +83,13 @@
 
   <footer class="page-note">
     <p>
-      <strong>Play both PvE and PvP?</strong>
-      The game's quest messages don't say which mode they came from, so a quest you finish in either mode is counted here,
-      and the quest list is the <strong id="mode-label">PvE</strong> one. If your PvP and PvE characters have different
-      progress, the numbers here can be off. &ldquo;Check &amp; reset my progress&rdquo; at the top starts you clean.
+      <strong>PvE, PvP and PvP Season.</strong>
+      Each mode is a separate character, so each keeps its own quests, progress, pins, story chapters and prestige.
+      You're looking at <strong id="mode-label">PvE</strong>; switch with the buttons at the top.
+      The game's quest messages don't say which mode they came from, so the tracker works it out from which game server
+      the game was talking to at that moment. That matched the game's own records for PvE and PvP Season; regular PvP
+      couldn't be checked because it needs a PvP session to compare against. If something lands in the wrong mode,
+      &ldquo;Scan my logs&rdquo; at the top re-reads everything.
     </p>
   </footer>
 

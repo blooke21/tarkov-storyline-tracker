@@ -1,6 +1,8 @@
 import { readFileSync, statSync } from "node:fs";
 import { findLogFile, listSessionFolders } from "../logWatcher/discovery.js";
 import { extractNotificationEvents } from "../logWatcher/notificationEvents.js";
+import { extractModeMarkers, modeAt } from "../logWatcher/modeTimeline.js";
+import type { GameMode } from "../tarkovData/gameMode.js";
 import type { ProgressStore } from "../progress/store.js";
 import type { TarkovTask } from "../tarkovData/types.js";
 
@@ -30,6 +32,7 @@ interface ParsedEvent {
   status: "accepted" | "failed" | "completed";
   occurredAt: Date;
   traderId: string | null;
+  mode: GameMode;
 }
 
 const RECENT_LIMIT = 12;
@@ -39,29 +42,43 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 // so asking again every minute re-reads one file instead of the whole history.
 const parsedFiles = new Map<string, { signature: string; events: ParsedEvent[] }>();
 
-function eventsOf(path: string): ParsedEvent[] {
-  let signature: string;
+function signatureOf(path: string | null): string {
+  if (!path) {
+    return "none";
+  }
   try {
     const stats = statSync(path);
-    signature = `${stats.size}:${stats.mtimeMs}`;
+    return `${stats.size}:${stats.mtimeMs}`;
   } catch {
-    return [];
+    return "gone";
   }
-  const cached = parsedFiles.get(path);
+}
+
+/** A session's quest events, each with the mode it happened in (the backend log tells which server the game used). */
+function eventsOf(pushPath: string, backendPath: string | null): ParsedEvent[] {
+  const signature = `${signatureOf(pushPath)}|${signatureOf(backendPath)}`;
+  const cached = parsedFiles.get(pushPath);
   if (cached?.signature === signature) {
     return cached.events;
   }
   let events: ParsedEvent[] = [];
   try {
-    for (const event of extractNotificationEvents(readFileSync(path, "utf-8"))) {
+    const markers = backendPath ? extractModeMarkers(readFileSync(backendPath, "utf-8")) : [];
+    for (const event of extractNotificationEvents(readFileSync(pushPath, "utf-8"))) {
       if (event.kind === "task") {
-        events.push({ taskId: event.taskId, status: event.status, occurredAt: event.occurredAt, traderId: event.traderId });
+        events.push({
+          taskId: event.taskId,
+          status: event.status,
+          occurredAt: event.occurredAt,
+          traderId: event.traderId,
+          mode: modeAt(markers, event.occurredAt, "pve"),
+        });
       }
     }
   } catch {
     events = [];
   }
-  parsedFiles.set(path, { signature, events });
+  parsedFiles.set(pushPath, { signature, events });
   return events;
 }
 
@@ -86,8 +103,8 @@ export function buildOperationalResponse(deps: OperationalDeps): OperationalResp
     if (!path) {
       continue;
     }
-    for (const event of eventsOf(path)) {
-      if (listed.has(event.taskId) || (event.status !== "completed" && event.status !== "failed")) {
+    for (const event of eventsOf(path, findLogFile(session.path, "backend"))) {
+      if (event.mode !== deps.store.mode || listed.has(event.taskId) || (event.status !== "completed" && event.status !== "failed")) {
         continue;
       }
       if (since && event.occurredAt < since) {
