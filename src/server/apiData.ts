@@ -12,6 +12,8 @@ export interface StatusResponse {
   progressSince: string | null;
   /** Where the game's logs are being read from, and whether that folder exists. Null if the app wasn't told. */
   logsFolder: LogsFolderInfo | null;
+  /** Which mode's quest list the tracker is showing. */
+  gameMode: "pve" | "regular" | null;
 }
 
 export interface LogsFolderInfo {
@@ -25,13 +27,19 @@ export interface LogsFolderInfo {
   settingsFile: string;
 }
 
-export function buildStatusResponse(cache: TaskCache | null, store: ProgressStore, logsFolder: LogsFolderInfo | null = null): StatusResponse {
+export function buildStatusResponse(
+  cache: TaskCache | null,
+  store: ProgressStore,
+  logsFolder: LogsFolderInfo | null = null,
+  gameMode: "pve" | "regular" | null = null
+): StatusResponse {
   return {
     taskGraphFetchedAt: cache?.fetchedAt ?? null,
     lastRaidSeenAt: store.getMeta("lastRaidSeenAt"),
     lastWatcherPollAt: store.getMeta("lastWatcherPollAt"),
     progressSince: store.getProgressSince()?.toISOString() ?? null,
     logsFolder,
+    gameMode,
   };
 }
 
@@ -43,6 +51,8 @@ export interface StorylineProgress {
   kind: "chain" | null;
   /** The player has started this line: something in it is accepted, or some of it is done but not all. */
   inProgress: boolean;
+  /** Quests in this line that were failed (a failed quest can't be redone, and it can block the quests after it). */
+  failedTasks: number;
 }
 
 export interface ProgressResponse {
@@ -72,6 +82,7 @@ export function buildProgressResponse(
         completedTasks,
         kind: storyline.kind ?? null,
         inProgress: hasAccepted || (completedTasks > 0 && completedTasks < totalTasks),
+        failedTasks: storyline.taskIds.filter((id) => statuses.get(id) === "failed").length,
       };
     }),
   };
@@ -85,6 +96,8 @@ export interface TaskResponseItem {
   wikiLink: string | null;
   status: TaskStatus | null;
   actionable: boolean;
+  /** A quest it needs completed was failed, so it can't be done any more. */
+  blocked: boolean;
   /** The player pinned this quest in the dashboard. */
   pinned: boolean;
   objectives: Array<{ description: string; optional: boolean }>;
@@ -101,16 +114,41 @@ export interface TasksFilter {
   map?: string;
 }
 
+/**
+ * Whether the earlier quest is in a state the requirement accepts. The feed lists the accepted states
+ * ("complete", "active", "failed"); "active" counts once the quest is started, and stays true after it's finished.
+ */
+function requirementMet(requirement: TarkovTask["taskRequirements"][number], statuses: Map<string, TaskStatus>): boolean {
+  const status = statuses.get(requirement.task.id);
+  const wanted = requirement.status;
+  if (wanted.length === 0) {
+    return true;
+  }
+  return (
+    (wanted.includes("complete") && status === "completed") ||
+    (wanted.includes("active") && (status === "accepted" || status === "completed")) ||
+    (wanted.includes("failed") && status === "failed")
+  );
+}
+
+// A failed quest can't be redone, so it is never "next up"; neither is one that is already finished.
 function isActionable(task: TarkovTask, statuses: Map<string, TaskStatus>): boolean {
-  if (statuses.get(task.id) === "completed") {
+  const status = statuses.get(task.id);
+  if (status === "completed" || status === "failed") {
     return false;
   }
-  return task.taskRequirements.every((requirement) => {
-    if (!requirement.status.includes("complete")) {
-      return true;
-    }
-    return statuses.get(requirement.task.id) === "completed";
-  });
+  return task.taskRequirements.every((requirement) => requirementMet(requirement, statuses));
+}
+
+/** A quest that can no longer be started because a quest it needs completed was failed instead. */
+function isBlocked(task: TarkovTask, statuses: Map<string, TaskStatus>): boolean {
+  const status = statuses.get(task.id);
+  if (status === "completed" || status === "accepted" || status === "failed") {
+    return false;
+  }
+  return task.taskRequirements.some(
+    (requirement) => statuses.get(requirement.task.id) === "failed" && !requirement.status.includes("failed")
+  );
 }
 
 export function buildTasksResponse(
@@ -142,6 +180,7 @@ export function buildTasksResponse(
       wikiLink: task.wikiLink,
       status: statuses.get(task.id) ?? null,
       actionable: isActionable(task, statuses),
+      blocked: isBlocked(task, statuses),
       pinned: pins.has(task.id),
       objectives: task.objectives.map((objective) => ({
         description: objective.description,

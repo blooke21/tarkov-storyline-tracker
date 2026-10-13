@@ -170,6 +170,49 @@ describe("startApp", () => {
     await new Promise<void>((resolve) => blocker.close(() => resolve()));
   });
 
+  it("moves up to the next free port when asked to and the port is taken", async () => {
+    const { config } = setUp();
+    const blocker = createHttpServer((_req, res) => res.end());
+    await new Promise<void>((resolve) => blocker.listen(0, "127.0.0.1", resolve));
+    const taken = (blocker.address() as AddressInfo).port;
+
+    app = await startApp({ ...config, port: taken, findFreePort: true });
+
+    expect((app.server.address() as AddressInfo).port).toBeGreaterThan(taken);
+    await new Promise<void>((resolve) => blocker.close(() => resolve()));
+  });
+
+  it("checks for new quest data again while it runs", async () => {
+    const { config, fake } = setUp();
+
+    app = await startApp({ ...config, refreshIntervalMs: 30 });
+    expect(fake.jsonSyncCount()).toBe(1);
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    expect(fake.jsonSyncCount()).toBeGreaterThan(1);
+    expect((await fetch(`${baseUrl(app)}/api/status`)).status).toBe(200);
+  });
+
+  it("keeps serving the quests it has when a refresh fails", async () => {
+    const { config } = setUp();
+    let failing = false;
+    const inner = config.fetchImpl as typeof fetch;
+    const fetchImpl = (async (input: string | URL, init?: RequestInit) => {
+      if (failing) throw new TypeError("offline");
+      return inner(input, init);
+    }) as typeof fetch;
+
+    app = await startApp({ ...config, fetchImpl, refreshIntervalMs: 30 });
+    const before = ((await (await fetch(`${baseUrl(app)}/api/tasks`)).json()) as { tasks: unknown[] }).tasks.length;
+    failing = true;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    const after = ((await (await fetch(`${baseUrl(app)}/api/tasks`)).json()) as { tasks: unknown[] }).tasks.length;
+    expect(after).toBe(before);
+    expect(after).toBeGreaterThan(0);
+  });
+
   it("keeps its saved progress in TARKOV_DATA_DIR when that is set, leaving the project folder alone", async () => {
     const { config } = setUp();
     const dataDir = join(tempDir!, "elsewhere");

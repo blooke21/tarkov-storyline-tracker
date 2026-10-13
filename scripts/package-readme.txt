@@ -46,6 +46,27 @@ The game does not log your prestige level, player level, skills, hideout or
 which story chapter step you are on, so those are things you set yourself in
 the tracker. Quests (accepted, completed, failed) are tracked automatically.
 
+Daily and weekly operational tasks: the game only records that you finished
+one (not what it was, or when you accepted it), so the tracker shows a count
+and a list of the ones you completed.
+
+PLAYING BOTH PVE AND PVP?
+-------------------------
+The game's quest messages don't say which mode they came from, so a quest you
+finish in either mode is counted, and the quest list is the PvE one (set the
+TARKOV_GAME_MODE environment variable to "regular" for the PvP list). If your
+two characters have different progress the numbers can be off; "Check & reset
+my progress" starts you clean.
+
+FAILED QUESTS
+-------------
+A failed quest is shown in red, is never offered as "next up", and a quest
+that needs it completed is marked Blocked.
+
+IF PORT 4173 IS TAKEN
+---------------------
+The tracker uses the next free port and opens the browser there.
+
 NEW CHARACTER?
 --------------
 Use "Check & reset my progress" at the top of the page.

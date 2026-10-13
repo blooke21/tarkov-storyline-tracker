@@ -121,6 +121,10 @@ function renderLogsWarning(logsFolder) {
 
 function renderStatus(status) {
   renderLogsWarning(status.logsFolder);
+  const mode = document.getElementById("mode-label");
+  if (mode && status.gameMode) {
+    mode.textContent = status.gameMode === "regular" ? "PvP (regular)" : "PvE";
+  }
   const line = document.getElementById("status-line");
   const parts = [];
   parts.push(
@@ -397,7 +401,7 @@ function renderPinned() {
     const card = el(
       "div",
       { className: "now-box" },
-      el("h4", {}, task.name, " ", task.status ? el("span", { className: "badge" }, task.status) : ""),
+      el("h4", {}, task.name, " ", task.status ? el("span", { className: "badge" + (task.status === "failed" ? " failed" : "") }, task.status) : ""),
       el("div", { className: "task-meta" }, `${task.trader}${task.map ? " • " + task.map : ""}`),
       el("ul", {}, ...objectives)
     );
@@ -462,6 +466,9 @@ function storylineCard(storyline, selected) {
   if (storyline.inProgress) {
     title.append(" ", el("span", { className: "badge active" }, "In progress"));
   }
+  if (storyline.failedTasks > 0) {
+    title.append(" ", el("span", { className: "badge failed", title: "Failed quests can't be redone" }, `${storyline.failedTasks} failed`));
+  }
   return el(
     "button",
     {
@@ -512,7 +519,8 @@ function taskLine(task) {
 
 // "Working on now" for the selected quest line: the quests the player has
 // accepted, with what's left to do, and what they can start next.
-// "Accepted only" (on unless the player turns it off) limits the quest list to quests they have accepted.
+// "Accepted only" (on unless the player turns it off) limits the quest list to quests they have accepted,
+// plus ones they accepted and failed, so a failure never quietly disappears.
 function acceptedOnly() {
   return document.getElementById("filter-accepted").checked;
 }
@@ -644,7 +652,7 @@ function renderTasks() {
 
   const filtered = state.tasks.filter((task) => {
     if (storylineFilter && !task.storylineIds.includes(storylineFilter)) return false;
-    if (acceptedOnly() && task.status !== "accepted") return false;
+    if (acceptedOnly() && task.status !== "accepted" && task.status !== "failed") return false;
     if (traderFilter && task.trader !== traderFilter) return false;
     if (mapFilter && task.map !== mapFilter) return false;
     if (actionableOnly && !(task.actionable && task.status !== "completed")) return false;
@@ -665,14 +673,18 @@ function renderTasks() {
   }
   for (const task of filtered) {
     const card = document.createElement("div");
-    card.className = "task-card" + (task.status === "completed" ? " completed" : "");
+    card.className = "task-card" + (task.status === "completed" ? " completed" : "") + (task.status === "failed" ? " failed" : "");
     card.id = `task-${task.id}`;
     const badges = [];
-    if (task.actionable && task.status !== "completed") {
+    // "Next up" is for quests you can start; one you've already accepted isn't "next".
+    if (task.actionable && task.status !== "completed" && task.status !== "accepted") {
       badges.push('<span class="badge actionable">Next up</span>');
     }
     if (task.status) {
-      badges.push(`<span class="badge">${escapeHtml(task.status)}</span>`);
+      badges.push(`<span class="badge${task.status === "failed" ? " failed" : ""}">${escapeHtml(task.status)}</span>`);
+    }
+    if (task.blocked) {
+      badges.push('<span class="badge failed" title="You failed a quest this one needs completed">Blocked</span>');
     }
     const objectives = task.objectives
       .map((o) => `<li>${escapeHtml(o.description)}${o.optional ? " (optional)" : ""}</li>`)

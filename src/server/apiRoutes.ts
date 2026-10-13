@@ -12,6 +12,7 @@ import type { StoryChapter } from "../storyChapters/types.js";
 import { scanLogs } from "./scanApi.js";
 import { setPinned } from "./pinsApi.js";
 import { buildBringResponse } from "./bringApi.js";
+import { buildOperationalResponse } from "./operationalApi.js";
 import { buildPrestigeResponse, setPrestigeCondition, setPrestigeLevel } from "./prestigeApi.js";
 import type { PrestigeLevel } from "../prestige/prestigeData.js";
 import type { GameMode } from "../tarkovData/gameMode.js";
@@ -65,7 +66,7 @@ export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
   };
 
   return {
-    "GET /api/status": () => buildStatusResponse(deps.getCache(), deps.store, deps.logsFolder ?? null),
+    "GET /api/status": () => buildStatusResponse(deps.getCache(), deps.store, deps.logsFolder ?? null, deps.gameMode ?? "pve"),
     "GET /api/progress": () => buildProgressResponse(deps.getTasks(), deps.getStorylines(), deps.store),
     "GET /api/tasks": (url) =>
       buildTasksResponse(deps.getTasks(), deps.getStorylines(), deps.store, {
@@ -111,6 +112,9 @@ export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
       }
       return guide;
     },
+
+    "GET /api/operational": () =>
+      buildOperationalResponse({ store: deps.store, logsRootDir: deps.logsRootDir, getTasks: deps.getTasks }),
 
     "GET /api/pinned/bring": () => buildBringResponse({ store: deps.store, getTasks: deps.getTasks, getQuestGuide: deps.getQuestGuide }),
 

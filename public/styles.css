@@ -708,3 +708,65 @@ header .reset-panel {
   margin: 0.4rem 0.8rem 0.6rem;
   font-size: 0.75rem;
 }
+
+/* Failed and blocked quests */
+.badge.failed {
+  background: #b4443a;
+  color: #fff;
+}
+
+.task-card.failed {
+  border-color: #b4443a;
+}
+
+/* Operational tasks and the page note */
+#operational {
+  margin-bottom: 1.5rem;
+}
+
+.stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 7rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem;
+}
+
+.stat-tile strong {
+  font-size: 1.4rem;
+}
+
+.stat-tile span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.operational-list {
+  margin: 0.4rem 0;
+  padding-left: 1.2rem;
+  font-size: 0.9rem;
+}
+
+.operational-list .failed {
+  color: #e8847a;
+}
+
+.page-note {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 1.5rem 6rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.page-note strong {
+  color: var(--text);
+}

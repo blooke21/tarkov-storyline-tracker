@@ -50,6 +50,17 @@ export async function isTrackerRunning(port: number, fetchImpl: typeof fetch = f
   }
 }
 
+/**
+ * The port a tracker is already answering on, looking at `count` ports from `startPort` (a tracker that
+ * couldn't get the usual port moves up to the next free one). Null if none is running.
+ */
+export async function findRunningTracker(startPort: number, count: number, fetchImpl: typeof fetch = fetch): Promise<number | null> {
+  const ports = Array.from({ length: count }, (_, i) => startPort + i);
+  const running = await Promise.all(ports.map((port) => isTrackerRunning(port, fetchImpl)));
+  const index = running.indexOf(true);
+  return index === -1 ? null : ports[index];
+}
+
 export function shouldOpenBrowser(argv: string[], env: NodeJS.ProcessEnv): boolean {
   return !argv.includes("--no-open") && env.TARKOV_NO_OPEN !== "1";
 }

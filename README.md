@@ -10,7 +10,9 @@ Tracks your Escape from Tarkov quest progress automatically by reading the game'
 
 The zip includes its own copy of Node.js, so nothing needs to be installed. The tracker finds your game's `Logs` folder using the BSG Launcher's settings and the usual install folders; if it can't, the page shows exactly how to point it at the right one. See `README.txt` inside the zip for details, including the Windows "protected your PC" prompt.
 
-**What it tracks automatically:** quests you accept, complete or fail (from the game's notification log). **What the game doesn't log**, so you set it yourself: prestige level, story-chapter steps, player level, skills, hideout, quest pins.
+**What it tracks automatically:** quests you accept, complete or fail (from the game's notification log), plus a count of the daily and weekly operational tasks you finish. **What the game doesn't log**, so you set it yourself: prestige level, story-chapter steps, player level, skills, hideout, quest pins.
+
+**Playing both PvE and PvP?** The game's quest messages don't say which mode they came from, so quests you finish in either mode are counted (the page says so, and shows which mode's quest list it is using). Mode is visible in the game's server traffic, which the tracker doesn't use yet.
 
 ## For developers
 
@@ -24,7 +26,7 @@ npm run package      # build release/TarkovStorylineTracker-<version>-windows.zi
 node scripts/build-story-data.mjs   # refresh story chapter data from the wiki
 ```
 
-Settings (environment variables): `TARKOV_GAME_MODE` (`pve` default, or `regular`), `TARKOV_LOGS_DIR` (the game's `Logs` folder), `TARKOV_DATA_DIR` (where progress and downloaded data are kept; defaults to the project folder), `TARKOV_PORT` (default 4173), `TARKOV_NO_OPEN=1` (don't open the browser).
+Settings (environment variables): `TARKOV_GAME_MODE` (`pve` default, or `regular`), `TARKOV_LOGS_DIR` (the game's `Logs` folder), `TARKOV_DATA_DIR` (where progress and downloaded data are kept; defaults to the project folder), `TARKOV_PORT` (default 4173; if it's taken and you didn't set one, the next free port is used), `TARKOV_NO_OPEN=1` (don't open the browser).
 
 Node 22, TypeScript, SQLite via `better-sqlite3`, no web framework. See `docs/superpowers/` for the design notes.
 

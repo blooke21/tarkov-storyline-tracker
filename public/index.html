@@ -19,6 +19,7 @@
           Too many quests showing as done, or quests you just finished not showing as completed?
           That usually means you reset your character and the tracker is still counting your old one.
           &ldquo;Scan my logs&rdquo; re-reads every game log and fills in anything the tracker missed.
+          Play both PvE and PvP? See the note at the bottom of the page.
         </p>
         <div class="reset-actions">
           <button id="open-scan" type="button" class="button">Scan my logs</button>
@@ -43,6 +44,8 @@
       <section id="storylines" aria-label="Quest lines"></section>
 
       <section id="prestige" aria-label="Prestige"></section>
+
+      <section id="operational" aria-label="Operational tasks"></section>
 
       <section aria-label="Filters" class="filters">
         <label>
@@ -77,12 +80,22 @@
     </div>
   </main>
 
+  <footer class="page-note">
+    <p>
+      <strong>Play both PvE and PvP?</strong>
+      The game's quest messages don't say which mode they came from, so a quest you finish in either mode is counted here,
+      and the quest list is the <strong id="mode-label">PvE</strong> one. If your PvP and PvE characters have different
+      progress, the numbers here can be off. &ldquo;Check &amp; reset my progress&rdquo; at the top starts you clean.
+    </p>
+  </footer>
+
   <aside id="bring-box" class="bring-box" aria-label="Items to bring into your raid" hidden></aside>
 
   <script src="/guide.js"></script>
   <script src="/app.js"></script>
   <script src="/chapters.js"></script>
   <script src="/prestige.js"></script>
+  <script src="/operational.js"></script>
   <script src="/reset.js"></script>
 </body>
 </html>

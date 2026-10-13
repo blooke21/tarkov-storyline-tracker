@@ -6,6 +6,7 @@ export interface TaskLogEvent {
   taskId: string;
   status: "accepted" | "failed" | "completed";
   occurredAt: Date;
+  traderId: string | null;
 }
 
 /**
@@ -30,7 +31,7 @@ export function collectTaskEvents(logsRootDir: string): TaskLogEvent[] {
     }
     for (const event of extractNotificationEvents(text)) {
       if (event.kind === "task") {
-        events.push({ taskId: event.taskId, status: event.status, occurredAt: event.occurredAt });
+        events.push({ taskId: event.taskId, status: event.status, occurredAt: event.occurredAt, traderId: event.traderId });
       }
     }
   }

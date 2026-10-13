@@ -1,7 +1,7 @@
 import { parseLogLine, logLineTimestamp, type ParsedLogLine } from "./logLine.js";
 
 export type NotificationEvent =
-  | { kind: "task"; taskId: string; status: "accepted" | "failed" | "completed"; occurredAt: Date }
+  | { kind: "task"; taskId: string; status: "accepted" | "failed" | "completed"; occurredAt: Date; traderId: string | null }
   | { kind: "raidEnded"; occurredAt: Date; map: string | null };
 
 const TASK_STATUS_BY_TYPE: Record<number, "accepted" | "failed" | "completed"> = {
@@ -110,5 +110,7 @@ function parseTaskEvent(json: any, headerLine: ParsedLogLine): NotificationEvent
     return null;
   }
   const occurredAt = typeof message.dt === "number" ? new Date(message.dt * 1000) : logLineTimestamp(headerLine);
-  return { kind: "task", taskId, status, occurredAt };
+  // The trader the message came from (the chat "dialog" it arrived in).
+  const traderId = typeof message.uid === "string" ? message.uid : typeof json.dialogId === "string" ? json.dialogId : null;
+  return { kind: "task", taskId, status, occurredAt, traderId };
 }

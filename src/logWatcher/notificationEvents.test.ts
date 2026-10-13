@@ -25,7 +25,7 @@ describe("extractNotificationEvents", () => {
     const events = extractNotificationEvents(text);
 
     expect(events).toEqual([
-      { kind: "task", taskId: "5967733e86f774602332fc84", status: "accepted", occurredAt: new Date(1763268882 * 1000) },
+      { kind: "task", taskId: "5967733e86f774602332fc84", status: "accepted", occurredAt: new Date(1763268882 * 1000), traderId: "dialog-placeholder" },
     ]);
   });
 
@@ -70,6 +70,7 @@ describe("extractNotificationEvents", () => {
         taskId: "61604635c725987e815b1a46",
         status: "completed",
         occurredAt: new Date(1763264233 * 1000),
+        traderId: "dialog-placeholder",
       },
     ]);
   });
@@ -97,7 +98,7 @@ describe("extractNotificationEvents", () => {
     const events = extractNotificationEvents(text);
 
     expect(events).toEqual([
-      { kind: "task", taskId: "596a101f86f7741ddb481582", status: "failed", occurredAt: new Date(1776546922 * 1000) },
+      { kind: "task", taskId: "596a101f86f7741ddb481582", status: "failed", occurredAt: new Date(1776546922 * 1000), traderId: "dialog-placeholder" },
     ]);
   });
 
@@ -170,6 +171,7 @@ describe("extractNotificationEvents", () => {
         taskId: "aaaaaaaaaaaaaaaaaaaaaaaa",
         status: "accepted",
         occurredAt: new Date(1700000000 * 1000),
+        traderId: null,
       },
     ]);
   });
@@ -202,6 +204,7 @@ describe("extractNotificationEvents", () => {
         taskId: "57ffe4461d7cb07d13629916",
         status: "accepted",
         occurredAt: new Date(1747689045 * 1000),
+        traderId: "dialog-placeholder",
       },
     ]);
   });

@@ -19,7 +19,7 @@ import type { PrestigeLevel } from "./prestige/prestigeData.js";
 import type { TarkovTask, TaskCache, GameMode } from "./index.js";
 import { createServer } from "./server/createServer.js";
 import { createApiRoutes } from "./server/apiRoutes.js";
-import { isTrackerRunning, openBrowser, shouldOpenBrowser } from "./launcher.js";
+import { findRunningTracker, openBrowser, shouldOpenBrowser } from "./launcher.js";
 
 export interface AppConfig {
   port?: number;
@@ -35,6 +35,10 @@ export interface AppConfig {
   prestigeCachePath?: string;
   /** Use these prestige requirements instead of downloading them (for tests). */
   prestigeLevels?: PrestigeLevel[];
+  /** If the port is taken, use the next free one instead of failing. */
+  findFreePort?: boolean;
+  /** How often quest data is refreshed while the app runs. Defaults to every 6 hours. */
+  refreshIntervalMs?: number;
 }
 
 export interface RunningApp {
@@ -49,6 +53,8 @@ export interface RunningApp {
 
 // 4173 unless TARKOV_PORT says otherwise (e.g. to run a second copy for trying things out).
 const PORT_FROM_ENV = Number(process.env.TARKOV_PORT);
+const PORT_ATTEMPTS = 20;
+const DEFAULT_REFRESH_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_PORT = Number.isInteger(PORT_FROM_ENV) && PORT_FROM_ENV > 0 && PORT_FROM_ENV < 65536 ? PORT_FROM_ENV : 4173;
 
 // The project folder (one above src/ or dist/), so the app finds its database
@@ -73,10 +79,9 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
   const dbPath = config.dbPath ?? join(dataDir, ".tarkov-progress.sqlite");
   const staticDir = config.staticDir ?? join(PROJECT_ROOT, "public");
 
-  const tasks: TarkovTask[] = await syncTaskGraph(cachePath, { fetchImpl: config.fetchImpl, gameMode });
-  const prestigeLevels =
-    config.prestigeLevels ??
-    (await syncPrestige(config.prestigeCachePath ?? join(dataDir, ".tarkov-prestige-cache.json"), { fetchImpl: config.fetchImpl, gameMode }));
+  const prestigeCachePath = config.prestigeCachePath ?? join(dataDir, ".tarkov-prestige-cache.json");
+  let tasks: TarkovTask[] = await syncTaskGraph(cachePath, { fetchImpl: config.fetchImpl, gameMode });
+  let prestigeLevels = config.prestigeLevels ?? (await syncPrestige(prestigeCachePath, { fetchImpl: config.fetchImpl, gameMode }));
 
   const store = new ProgressStore(dbPath);
   // Quest walkthroughs are fetched from the wiki the first time a quest's guide is opened, then kept on disk.
@@ -106,13 +111,25 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
 
   const server = createServer({ apiRoutes: routes, staticDir });
   try {
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(port, "127.0.0.1", () => {
-        server.removeListener("error", reject);
-        resolve();
-      });
-    });
+    // If the port is taken and the caller allows it, move up to the next free one.
+    const attempts = config.findFreePort ? PORT_ATTEMPTS : 1;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          server.once("error", reject);
+          server.listen(port + attempt, "127.0.0.1", () => {
+            server.removeListener("error", reject);
+            resolve();
+          });
+        });
+        break;
+      } catch (error) {
+        server.removeAllListeners("error");
+        if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE" || attempt + 1 >= attempts) {
+          throw error;
+        }
+      }
+    }
   } catch (error) {
     // We already opened the store and started the tailer above — if the
     // listen fails (e.g. EADDRINUSE), don't leak those open resources.
@@ -120,6 +137,26 @@ export async function startApp(config: AppConfig = {}): Promise<RunningApp> {
     store.close();
     throw error;
   }
+
+  // Quest data (and prestige requirements) are checked again every few hours, so a tracker left open
+  // across a game update or new quests keeps up. A failed refresh keeps what it has.
+  const refreshMs = config.refreshIntervalMs ?? DEFAULT_REFRESH_MS;
+  const refresh = setInterval(() => {
+    syncTaskGraph(cachePath, { fetchImpl: config.fetchImpl, gameMode, maxAgeMs: refreshMs })
+      .then((fresh) => {
+        tasks = fresh;
+      })
+      .catch(() => undefined);
+    if (!config.prestigeLevels) {
+      syncPrestige(prestigeCachePath, { fetchImpl: config.fetchImpl, gameMode, maxAgeMs: refreshMs })
+        .then((fresh) => {
+          if (fresh.length > 0) prestigeLevels = fresh;
+        })
+        .catch(() => undefined);
+    }
+  }, refreshMs);
+  refresh.unref();
+  server.on("close", () => clearInterval(refresh));
 
   return { server, store, tailer, gameMode, logs };
 }
@@ -132,8 +169,9 @@ const isMainModule = Boolean(process.argv[1]) && import.meta.url === pathToFileU
 async function main(): Promise<void> {
   const open = shouldOpenBrowser(process.argv, process.env);
 
-  if (await isTrackerRunning(DEFAULT_PORT)) {
-    const url = `http://127.0.0.1:${DEFAULT_PORT}`;
+  const runningOn = await findRunningTracker(DEFAULT_PORT, PORT_ATTEMPTS);
+  if (runningOn !== null) {
+    const url = `http://127.0.0.1:${runningOn}`;
     console.log(`Tarkov Storyline Tracker is already running - opening ${url}`);
     if (open) {
       openBrowser(url);
@@ -142,7 +180,8 @@ async function main(): Promise<void> {
   }
 
   console.log("Starting Tarkov Storyline Tracker (reading your game logs)...");
-  const app = await startApp();
+  // Unless a port was asked for, a taken one (something else using 4173) just means using the next free one.
+  const app = await startApp({ findFreePort: !process.env.TARKOV_PORT });
   const address = app.server.address();
   const port = typeof address === "object" && address ? address.port : DEFAULT_PORT;
   const url = `http://127.0.0.1:${port}`;
