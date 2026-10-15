@@ -49,6 +49,10 @@
       <section id="operational" aria-label="Operational tasks"></section>
 
       <section aria-label="Filters" class="filters">
+        <label class="search-label">
+          Search
+          <input type="search" id="filter-search" placeholder="Quest, trader, map or objective…  ( / )" autocomplete="off" />
+        </label>
         <label>
           Quest line
           <select id="filter-storyline"><option value="">All</option></select>
@@ -68,6 +72,10 @@
         <label>
           <input type="checkbox" id="filter-accepted" checked />
           Accepted only
+        </label>
+        <label>
+          <input type="checkbox" id="filter-endings" />
+          Multiple endings only
         </label>
         <label>
           <input type="checkbox" id="filter-hide-completed" />
@@ -93,7 +101,7 @@
     </p>
   </footer>
 
-  <aside id="bring-box" class="bring-box" aria-label="Items to bring into your raid" hidden></aside>
+  <aside id="side-menu" class="side-menu" aria-label="Things to know before your next raid" hidden></aside>
 
   <script src="/guide.js"></script>
   <script src="/app.js"></script>

@@ -65,6 +65,22 @@ the wrong mode, "Scan my logs" re-reads everything. (To start the tracker in a
 particular mode, set the TARKOV_GAME_MODE environment variable to pve, regular or
 pvp-season.)
 
+SEARCH
+------
+The Search box above the quest list narrows it as you type (name, trader, map or
+objective; press / to jump to it, Escape to clear). If matches are hidden because
+"Accepted only" is on, it tells you how many and lets you show them.
+
+CHOICES AND ENDINGS
+-------------------
+Some quests exclude each other: finishing one fails the others, and a few only
+open up if you fail another. Those quests carry a "Multiple endings" badge with
+the details (the "Multiple endings only" filter lists them), and the menu at the
+bottom-left of the screen has an Endings tab that warns you about the ones you've
+accepted or pinned. Story chapters with decisions (Falling Skies, Blue Fire, The
+Ticket's four endings, and Boreas' dependence on earlier choices) are marked too.
+The quest choices come from the quest data; the chapter ones are from the wiki.
+
 FAILED QUESTS
 -------------
 A failed quest is shown in red, is never offered as "next up", and a quest

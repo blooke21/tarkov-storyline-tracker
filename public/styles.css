@@ -649,7 +649,7 @@ header .reset-panel {
 }
 
 /* "Bring into raid" box, fixed to the bottom-left of the screen */
-.bring-box {
+.side-menu {
   position: fixed;
   left: 1rem;
   bottom: 1rem;
@@ -664,7 +664,7 @@ header .reset-panel {
   font-size: 0.85rem;
 }
 
-.bring-box[hidden] {
+.side-menu[hidden] {
   display: none;
 }
 
@@ -805,4 +805,114 @@ header .reset-panel {
 
 .mode-button:disabled:not(.active) {
   opacity: 0.5;
+}
+
+/* Search, the "multiple endings" warnings and the menu tabs */
+.search-label input {
+  width: min(22rem, 70vw);
+  margin-left: 0.4rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem;
+}
+
+.search-label input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.search-note {
+  margin: 0 0 0.6rem;
+}
+
+.badge.warn {
+  background: #8a5a1a;
+  color: #ffe2b0;
+}
+
+.endings-note {
+  margin: 0.5rem 0 0.2rem;
+  padding: 0.35rem 0.7rem;
+  background: #2a2113;
+  border: 1px solid #8a5a1a;
+  border-radius: 6px;
+  font-size: 0.88rem;
+}
+
+.endings-note summary {
+  cursor: pointer;
+  color: #ffd08a;
+  font-weight: 600;
+}
+
+.endings-note p {
+  margin: 0.4rem 0;
+}
+
+.menu-tabs {
+  display: flex;
+  gap: 0.3rem;
+  padding: 0.4rem 0.6rem 0;
+}
+
+.menu-tab {
+  flex: 1;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+  padding: 0.3rem 0.4rem;
+  cursor: pointer;
+}
+
+.menu-tab.active {
+  color: var(--text);
+  background: var(--bg);
+  border-bottom-color: var(--bg);
+  font-weight: 600;
+}
+
+.menu-tab.warn.active {
+  color: #ffd08a;
+}
+
+.ending-quest {
+  padding: 0.5rem 0.8rem 0.1rem;
+}
+
+.ending-quest a {
+  color: #ffd08a;
+  font-weight: 600;
+}
+
+.ending-quest p {
+  margin: 0.25rem 0;
+}
+
+.ending-quest ul {
+  margin: 0.25rem 0 0.4rem;
+  padding-left: 1.1rem;
+}
+
+.chapter-choice {
+  margin: 0.9rem 0;
+  padding: 0.6rem 0.9rem;
+  background: #2a2113;
+  border: 1px solid #8a5a1a;
+  border-radius: 8px;
+}
+
+.chapter-choice h3 {
+  margin: 0 0 0.3rem;
+  color: #ffd08a;
+}
+
+.chapter-choice ul {
+  margin: 0.3rem 0;
+  padding-left: 1.2rem;
 }

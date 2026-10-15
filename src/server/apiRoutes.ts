@@ -12,6 +12,7 @@ import type { StoryChapter } from "../storyChapters/types.js";
 import { scanLogs } from "./scanApi.js";
 import { setPinned } from "./pinsApi.js";
 import { buildBringResponse } from "./bringApi.js";
+import { buildEndingsResponse } from "./endingsApi.js";
 import { buildOperationalResponse } from "./operationalApi.js";
 import { buildPrestigeResponse, setPrestigeCondition, setPrestigeLevel } from "./prestigeApi.js";
 import type { PrestigeLevel } from "../prestige/prestigeData.js";
@@ -139,6 +140,8 @@ export function createApiRoutes(deps: ApiDeps): Record<string, ApiHandler> {
 
     "GET /api/operational": () =>
       buildOperationalResponse({ store: deps.store, logsRootDir: deps.logsRootDir, getTasks: deps.getTasks }),
+
+    "GET /api/endings": () => buildEndingsResponse({ store: deps.store, getTasks: deps.getTasks, chapterDeps }),
 
     "GET /api/pinned/bring": () => buildBringResponse({ store: deps.store, getTasks: deps.getTasks, getQuestGuide: deps.getQuestGuide }),
 

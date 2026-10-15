@@ -1,5 +1,5 @@
 import { DEFAULT_GAME_MODE, type GameMode } from "./gameMode.js";
-import type { BringRequirement, TarkovTask } from "./types.js";
+import type { BringRequirement, FailIfTask, TarkovTask } from "./types.js";
 
 /**
  * tarkov.dev's static JSON feed — the same data its own website runs on. It
@@ -111,6 +111,21 @@ export function extractBring(objective: RawObjective, items: Translations): Brin
   return bring;
 }
 
+/** The quests this one fails alongside, from the feed's fail conditions (only quest-status ones; duplicates collapsed). */
+export function extractFailIfTasks(raw: RawTask): FailIfTask[] {
+  const conditions = Array.isArray(raw.failConditions) ? (raw.failConditions as Array<Record<string, unknown>>) : [];
+  const found = new Map<string, FailIfTask>();
+  for (const condition of conditions) {
+    if (condition?.type !== "taskStatus" || typeof condition.task !== "string") {
+      continue;
+    }
+    const status = Array.isArray(condition.status) ? condition.status.filter((s): s is string => typeof s === "string") : [];
+    const key = `${condition.task}|${[...status].sort().join(",")}`;
+    found.set(key, { taskId: condition.task, status });
+  }
+  return [...found.values()];
+}
+
 export function convertJsonFeed(feed: JsonFeed): TarkovTask[] {
   return Object.entries(feed.tasks).map(([key, raw]) => {
     const mapId = raw.map ?? null;
@@ -142,6 +157,7 @@ export function convertJsonFeed(feed: JsonFeed): TarkovTask[] {
         status: requirement.status ?? [],
         task: { id: requirement.task },
       })),
+      failIfTasks: extractFailIfTasks(raw),
     };
   });
 }

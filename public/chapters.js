@@ -138,6 +138,7 @@
         },
         el("h3", {}, chapter.name),
         el("span", { className: `badge ${chapter.status}` }, STATUS_LABEL[chapter.status]),
+        chapter.choice ? el("span", { className: "badge warn", title: "This chapter has a decision or alternative endings" }, " ⚠ Choices") : "",
         el("div", { className: "chapter-steps" }, `${chapter.doneSteps}/${chapter.totalSteps} steps`),
         progressBar(chapter.doneSteps, chapter.totalSteps)
       );
@@ -196,6 +197,21 @@
       }
     }
     return row;
+  }
+
+  // The decision or alternative endings in a chapter (from the wiki), shown before the steps so it isn't a surprise.
+  function renderChoice(chapter) {
+    if (!chapter.choice) {
+      return "";
+    }
+    const { summary, options } = chapter.choice;
+    return el(
+      "div",
+      { className: "chapter-choice" },
+      el("h3", {}, "⚠ Choices in this chapter"),
+      el("p", {}, summary),
+      options.length ? el("ul", {}, ...options.map((o) => el("li", {}, el("strong", {}, o.label), ` — ${o.detail}`))) : ""
+    );
   }
 
   function renderNow(chapter) {
@@ -281,6 +297,7 @@
       el("p", { className: "chapter-steps" }, `${chapter.doneSteps}/${chapter.totalSteps} main steps done`),
       progressBar(chapter.doneSteps, chapter.totalSteps),
       actions,
+      renderChoice(chapter),
       renderNow(chapter),
       el("h3", {}, "All steps"),
       el(

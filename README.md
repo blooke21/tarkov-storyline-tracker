@@ -12,6 +12,8 @@ The zip includes its own copy of Node.js, so nothing needs to be installed. The 
 
 **What it tracks automatically:** quests you accept, complete or fail (from the game's notification log), plus a count of the daily and weekly operational tasks you finish. **What the game doesn't log**, so you set it yourself: prestige level, story-chapter steps, player level, skills, hideout, quest pins.
 
+**Search and choices.** The quest list has a search box (name, trader, map, objective; `/` focuses it). Quests that exclude each other (finishing one fails the others, or failing one opens another route) are badged "Multiple endings", filterable, and warned about in the bottom-left menu's Endings tab for quests you've accepted or pinned; the choices come from the quest data's fail conditions. Story chapters with decisions and endings are marked from the wiki.
+
 **PvE, PvP and PvP Season** are separate characters, so each has its own quests, progress, pins, story chapters and prestige; switch with the buttons at the top of the page. The game's quest messages carry no mode tag, so the tracker works out each message's mode from which game server (`gw-pve`, `gw-pvp`, `gw-pvp-season`) the game was talking to at that moment, read from the backend log. That was checked against the game's own mode markers for PvE and PvP Season (including mode switches inside one session); regular PvP uses the same mechanism but hasn't been verified against a real PvP session.
 
 ## For developers

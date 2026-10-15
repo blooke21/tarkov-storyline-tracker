@@ -3,6 +3,7 @@ import { GAME_MODES, GAME_MODE_LABELS, type GameMode } from "../tarkovData/gameM
 import type { TaskCache } from "../tarkovData/cache.js";
 import type { Storyline } from "../storylines/deriveStorylines.js";
 import type { ProgressStore, TaskStatus } from "../progress/store.js";
+import { computeEndings, describeEndings } from "../quests/endings.js";
 import { readPins } from "./pinsApi.js";
 
 export interface StatusResponse {
@@ -102,6 +103,8 @@ export interface TaskResponseItem {
   actionable: boolean;
   /** A quest it needs completed was failed, so it can't be done any more. */
   blocked: boolean;
+  /** Choices this quest is part of (finishing it fails others, or the reverse), or null if it has none. */
+  endings: { lines: string[]; blocksKappa: boolean } | null;
   /** The player pinned this quest in the dashboard. */
   pinned: boolean;
   objectives: Array<{ description: string; optional: boolean }>;
@@ -163,6 +166,7 @@ export function buildTasksResponse(
 ): TasksResponse {
   const statuses = store.getAllStatuses();
   const pins = new Set(readPins(store));
+  const endings = computeEndings(tasks, statuses);
   const storylinesByTaskId = new Map<string, string[]>();
   for (const storyline of storylines) {
     for (const taskId of storyline.taskIds) {
@@ -185,6 +189,9 @@ export function buildTasksResponse(
       status: statuses.get(task.id) ?? null,
       actionable: isActionable(task, statuses),
       blocked: isBlocked(task, statuses),
+      endings: endings.has(task.id)
+        ? { lines: describeEndings(endings.get(task.id)!, statuses.get(task.id) ?? null), blocksKappa: endings.get(task.id)!.blocksKappa }
+        : null,
       pinned: pins.has(task.id),
       objectives: task.objectives.map((objective) => ({
         description: objective.description,

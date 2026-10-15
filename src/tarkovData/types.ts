@@ -33,6 +33,12 @@ export interface TaskStatusRequirement {
   task: { id: string };
 }
 
+/** "This quest fails if that quest reaches one of these states" (the feed's way of saying two quests exclude each other). */
+export interface FailIfTask {
+  taskId: string;
+  status: string[];
+}
+
 export interface TarkovTask {
   id: string;
   name: string;
@@ -45,4 +51,9 @@ export interface TarkovTask {
   minPlayerLevel: number | null;
   objectives: TaskObjective[];
   taskRequirements: TaskStatusRequirement[];
+  /**
+   * Quests whose outcome fails this one, e.g. completing "Big Customer" fails "Chemical - Part 4". Undefined from
+   * sources that don't carry it (an older saved copy, the GraphQL fallback); an empty list when there are none.
+   */
+  failIfTasks?: FailIfTask[];
 }

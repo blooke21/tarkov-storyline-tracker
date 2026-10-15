@@ -64,8 +64,11 @@ async function fetchFreshTasks(gameMode: GameMode, fetchImpl?: typeof fetch): Pr
   }
 }
 
-function hasItemData(tasks: TarkovTask[]): boolean {
-  return tasks.some((task) => task.objectives.some((objective) => objective.bring !== undefined));
+// A saved copy from before the "what to bring" lists or the quest-choice data existed lacks these fields.
+function hasCurrentData(tasks: TarkovTask[]): boolean {
+  const hasBring = tasks.some((task) => task.objectives.some((objective) => objective.bring !== undefined));
+  const hasChoices = tasks.some((task) => task.failIfTasks !== undefined);
+  return hasBring && hasChoices;
 }
 
 /**
@@ -85,8 +88,8 @@ export async function syncTaskGraph(cachePath: string, options: SyncOptions = {}
   const loaded = loadCache(cachePath);
   const cached = loaded && loaded.gameMode === gameMode ? loaded : null;
 
-  // A saved copy from before the "what to bring" lists existed is refreshed once, even if it's recent.
-  if (cached && !isStale(cached.fetchedAt, maxAgeMs, now) && hasItemData(cached.tasks)) {
+  // A saved copy from before those fields existed is refreshed once, even if it's recent.
+  if (cached && !isStale(cached.fetchedAt, maxAgeMs, now) && hasCurrentData(cached.tasks)) {
     return cached.tasks;
   }
 

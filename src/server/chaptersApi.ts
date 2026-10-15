@@ -3,6 +3,7 @@ import type { ProgressStore } from "../progress/store.js";
 import type { ChapterObjective, GuideSection, StoryChapter } from "../storyChapters/types.js";
 import { STORY_CHAPTERS_META_KEY } from "../progress/store.js";
 import { CHAPTER_GUIDES } from "../storyChapters/guides.js";
+import { CHAPTER_CHOICES, type ChapterChoice } from "../storyChapters/endings.js";
 
 export type ChapterStatus = "not-started" | "active" | "done";
 
@@ -32,6 +33,8 @@ export interface ChapterView {
   totalSteps: number;
   /** Index of the first required main step not done yet — what to do next — or null. */
   currentIndex: number | null;
+  /** A decision or alternative endings in this chapter, from the wiki, or null if it has none. */
+  choice: ChapterChoice | null;
 }
 
 export interface ChaptersResponse {
@@ -99,6 +102,7 @@ function viewOf(chapter: StoryChapter, saved: SavedChapter | undefined): Chapter
     doneSteps: requiredSteps.filter((objective) => objective.done).length,
     totalSteps: requiredSteps.length,
     currentIndex: next ? next.index : null,
+    choice: CHAPTER_CHOICES[chapter.id] ?? null,
   };
 }
 

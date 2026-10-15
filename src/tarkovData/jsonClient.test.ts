@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { convertJsonFeed, extractBring, fetchTasksFromJson, TARKOV_DEV_JSON_BASE_URL } from "./jsonClient.js";
-import type { JsonFeed } from "./jsonClient.js";
+import { convertJsonFeed, extractBring, extractFailIfTasks, fetchTasksFromJson, TARKOV_DEV_JSON_BASE_URL } from "./jsonClient.js";
+import type { JsonFeed, RawTask } from "./jsonClient.js";
 import { jsonFeedSample } from "./__fixtures__/jsonFeedSample.js";
 import { createFakeFeedFetch } from "./__fixtures__/fakeFeedFetch.js";
 import { deriveStorylines } from "../storylines/deriveStorylines.js";
@@ -105,6 +105,7 @@ describe("convertJsonFeed (against real captured feed data)", () => {
         minPlayerLevel: null,
         objectives: [],
         taskRequirements: [],
+        failIfTasks: [],
       },
     ]);
   });
@@ -247,5 +248,36 @@ describe("extractBring (what to take into a raid)", () => {
     };
 
     expect(convertJsonFeed(feed)[0].objectives[0].bring).toEqual([{ kind: "marker", names: ["MS2000 Marker"], count: 2 }]);
+  });
+});
+
+describe("extractFailIfTasks (quests that exclude each other)", () => {
+  const raw = (failConditions: unknown): RawTask => ({ id: "t", name: "t", trader: "x", failConditions });
+
+  it("reads the quest-status fail conditions and ignores the other kinds", () => {
+    expect(
+      extractFailIfTasks(
+        raw([
+          { type: "taskStatus", task: "other", status: ["complete"] },
+          { type: "shoot", count: 1 },
+          { type: "extract" },
+        ])
+      )
+    ).toEqual([{ taskId: "other", status: ["complete"] }]);
+  });
+
+  it("collapses the duplicates the real feed contains", () => {
+    const twice = { type: "taskStatus", task: "other", status: ["complete"] };
+
+    expect(extractFailIfTasks(raw([twice, twice]))).toEqual([{ taskId: "other", status: ["complete"] }]);
+  });
+
+  it("copes with a task that has none, or malformed ones", () => {
+    expect(extractFailIfTasks(raw(undefined))).toEqual([]);
+    expect(extractFailIfTasks(raw([null, { type: "taskStatus" }, { type: "taskStatus", task: 5 }]))).toEqual([]);
+  });
+
+  it("comes through a full conversion on the real captured sample", () => {
+    expect(convertJsonFeed(jsonFeedSample).every((t) => Array.isArray(t.failIfTasks))).toBe(true);
   });
 });

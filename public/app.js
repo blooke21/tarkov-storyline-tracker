@@ -4,6 +4,9 @@ const state = {
   moreLinesOpen: false,
   pendingQuest: null,
   bringSignature: null,
+  bringData: [],
+  endingsData: { quests: [], chapters: [] },
+  searchIndex: new Map(),
   // Wiki walkthroughs for quests: opened ones, and what has been fetched (a guide, or "loading" / "error").
   openGuides: new Set(),
   questGuides: {},
@@ -37,6 +40,7 @@ async function loadData() {
 
     state.storylines = progress.storylines;
     state.tasks = tasksData.tasks;
+    state.searchIndex = new Map();
 
     renderStatus(status);
     renderOverall(progress.overall);
@@ -45,7 +49,7 @@ async function loadData() {
     renderStorylines(state.storylines);
     renderFocus();
     renderTasks();
-    refreshBringBox();
+    refreshSideMenu();
     if (state.pendingQuest) {
       const id = state.pendingQuest;
       state.pendingQuest = null;
@@ -71,6 +75,8 @@ function showQuest(taskId) {
   document.getElementById("filter-actionable").checked = false;
   document.getElementById("filter-hide-completed").checked = false;
   document.getElementById("filter-accepted").checked = false; // not remembered: it's only for this jump
+  document.getElementById("filter-search").value = "";
+  document.getElementById("filter-endings").checked = false;
   renderStorylines(state.storylines);
   renderFocus();
   renderTasks();
@@ -218,7 +224,7 @@ async function togglePin(task) {
     renderPinned();
     renderFocus();
     renderTasks();
-    refreshBringBox();
+    refreshSideMenu();
   } catch (error) {
     console.error("Could not save the pin:", error);
     alert("Could not save that pin — is the tracker still running?");
@@ -325,89 +331,174 @@ function addQuestGuide(card, task) {
   }
 }
 
-// ---- "bring into raid" box: what the pinned quests need on you (bottom-left of the screen) ----
+// ---- the menu at the bottom-left of the screen: what to bring into a raid, and choices to watch out for ----
 
-const BRING_BOX_KEY = "tarkovTracker.bringBox";
+const MENU_COLLAPSED_KEY = "tarkovTracker.bringBox";
+const MENU_TAB_KEY = "tarkovTracker.menuTab";
 
-// Asks the server only when the set of pinned, unfinished quests changes (the answer can involve a wiki lookup).
-async function refreshBringBox() {
-  const pinned = state.tasks.filter((t) => t.pinned && t.status !== "completed").map((t) => t.id);
-  const signature = pinned.join(",");
-  if (signature === state.bringSignature) {
-    return;
-  }
-  state.bringSignature = signature;
-  if (pinned.length === 0) {
-    renderBringBox([]);
-    return;
-  }
+function readSetting(key) {
   try {
-    const response = await fetch("/api/pinned/bring");
-    if (!response.ok) {
-      throw new Error(`${response.status}`);
-    }
-    renderBringBox((await response.json()).quests);
-  } catch (error) {
-    console.error("Could not load the items to bring:", error);
-    state.bringSignature = null; // try again on the next refresh
+    return localStorage.getItem(key);
+  } catch {
+    return null;
   }
 }
 
-function renderBringBox(quests) {
-  const box = document.getElementById("bring-box");
-  const itemCount = quests.reduce((sum, quest) => sum + quest.items.length, 0);
-  box.hidden = itemCount === 0;
-  if (itemCount === 0) {
+function writeSetting(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Not remembered; fine.
+  }
+}
+
+// Choices are cheap to work out, so they're asked for on every refresh. The bring list can involve a wiki
+// lookup, so it's only asked for when the set of pinned, unfinished quests changes.
+async function refreshSideMenu() {
+  try {
+    const response = await fetch("/api/endings");
+    if (response.ok) {
+      state.endingsData = await response.json();
+    }
+  } catch (error) {
+    console.error("Could not load the choices to watch out for:", error);
+  }
+
+  const pinned = state.tasks.filter((t) => t.pinned && t.status !== "completed").map((t) => t.id);
+  const signature = pinned.join(",");
+  if (signature !== state.bringSignature) {
+    state.bringSignature = signature;
+    if (pinned.length === 0) {
+      state.bringData = [];
+    } else {
+      try {
+        const response = await fetch("/api/pinned/bring");
+        if (!response.ok) {
+          throw new Error(`${response.status}`);
+        }
+        state.bringData = (await response.json()).quests;
+      } catch (error) {
+        console.error("Could not load the items to bring:", error);
+        state.bringSignature = null; // try again on the next refresh
+      }
+    }
+  }
+  renderSideMenu();
+}
+
+function renderBringTab(quests) {
+  const nodes = [];
+  for (const quest of quests) {
+    const list = el(
+      "ul",
+      {},
+      ...quest.items.map((item) =>
+        el("li", {}, item.text, item.note ? el("span", { className: "bring-note" }, ` — ${item.note}`) : "")
+      )
+    );
+    nodes.push(
+      el(
+        "div",
+        { className: "bring-quest" },
+        el("a", { href: `#quest/${quest.taskId}`, title: "Show this quest", onclick: (event) => { event.preventDefault(); showQuest(quest.taskId); } }, quest.name),
+        list
+      )
+    );
+  }
+  nodes.push(el("p", { className: "hint bring-credit" }, "From the quest data and the wiki, for the quests you've pinned."));
+  return nodes;
+}
+
+function renderEndingsTab(data) {
+  const nodes = [];
+  for (const quest of data.quests) {
+    nodes.push(
+      el(
+        "div",
+        { className: "ending-quest" },
+        el("a", { href: `#quest/${quest.taskId}`, title: "Show this quest", onclick: (event) => { event.preventDefault(); showQuest(quest.taskId); } }, quest.name),
+        " ",
+        el("span", { className: "badge" }, quest.accepted ? "accepted" : "pinned"),
+        ...quest.lines.map((line) => el("p", {}, line))
+      )
+    );
+  }
+  for (const chapter of data.chapters) {
+    nodes.push(
+      el(
+        "div",
+        { className: "ending-quest" },
+        el("a", { href: `#chapter/${encodeURIComponent(chapter.id)}`, title: "Open this chapter" }, `📖 ${chapter.name} (story)`),
+        el("p", {}, chapter.choice.summary),
+        chapter.choice.options.length
+          ? el("ul", {}, ...chapter.choice.options.map((o) => el("li", {}, el("strong", {}, o.label), ` — ${o.detail}`)))
+          : ""
+      )
+    );
+  }
+  nodes.push(
+    el(
+      "p",
+      { className: "hint bring-credit" },
+      "Quests you've accepted or pinned, and story chapters you're on. A finished or failed quest can't be undone, so check before you complete one."
+    )
+  );
+  return nodes;
+}
+
+function renderSideMenu() {
+  const box = document.getElementById("side-menu");
+  const bring = state.bringData;
+  const choices = state.endingsData;
+  const bringCount = bring.reduce((sum, quest) => sum + quest.items.length, 0);
+  const warnCount = choices.quests.length + choices.chapters.length;
+  box.hidden = bringCount + warnCount === 0;
+  if (box.hidden) {
     box.replaceChildren();
     return;
   }
 
-  let collapsed = false;
-  try {
-    collapsed = localStorage.getItem(BRING_BOX_KEY) === "collapsed";
-  } catch {
-    // Storage unavailable: starts open.
-  }
+  const collapsed = readSetting(MENU_COLLAPSED_KEY) === "collapsed";
+  // The tab the player picked, unless it has nothing in it right now.
+  let tab = readSetting(MENU_TAB_KEY) === "endings" ? "endings" : "bring";
+  if (tab === "bring" && bringCount === 0) tab = "endings";
+  if (tab === "endings" && warnCount === 0) tab = "bring";
 
-  const header = el(
-    "button",
-    {
-      type: "button",
-      className: "bring-header",
-      title: collapsed ? "Show the list" : "Hide the list",
-      onclick: () => {
-        try {
-          localStorage.setItem(BRING_BOX_KEY, collapsed ? "open" : "collapsed");
-        } catch {
-          // Not remembered; fine.
-        }
-        renderBringBox(quests);
+  const summary = [bringCount ? `🎒 ${bringCount}` : "", warnCount ? `⚠ ${warnCount}` : ""].filter(Boolean).join("  ·  ");
+  const nodes = [
+    el(
+      "button",
+      {
+        type: "button",
+        className: "bring-header",
+        title: collapsed ? "Show the list" : "Hide the list",
+        onclick: () => {
+          writeSetting(MENU_COLLAPSED_KEY, collapsed ? "open" : "collapsed");
+          renderSideMenu();
+        },
       },
-    },
-    el("span", {}, `🎒 Bring into raid (${itemCount})`),
-    el("span", { className: "bring-toggle" }, collapsed ? "▴" : "▾")
-  );
-  const nodes = [header];
+      el("span", {}, summary),
+      el("span", { className: "bring-toggle" }, collapsed ? "▴" : "▾")
+    ),
+  ];
 
   if (!collapsed) {
-    for (const quest of quests) {
-      const list = el(
-        "ul",
-        {},
-        ...quest.items.map((item) =>
-          el("li", {}, item.text, item.note ? el("span", { className: "bring-note" }, ` — ${item.note}`) : "")
-        )
+    const tabButton = (id, label, count, warn) =>
+      el(
+        "button",
+        {
+          type: "button",
+          className: "menu-tab" + (warn ? " warn" : "") + (tab === id ? " active" : ""),
+          disabled: count === 0,
+          onclick: () => {
+            writeSetting(MENU_TAB_KEY, id);
+            renderSideMenu();
+          },
+        },
+        `${label} (${count})`
       );
-      nodes.push(
-        el(
-          "div",
-          { className: "bring-quest" },
-          el("a", { href: `#quest/${quest.taskId}`, title: "Show this quest", onclick: (event) => { event.preventDefault(); showQuest(quest.taskId); } }, quest.name),
-          list
-        )
-      );
-    }
-    nodes.push(el("p", { className: "hint bring-credit" }, "From the quest data and the wiki, for the quests you've pinned."));
+    nodes.push(el("div", { className: "menu-tabs" }, tabButton("bring", "🎒 Bring into raid", bringCount, false), tabButton("endings", "⚠ Endings", warnCount, true)));
+    nodes.push(...(tab === "endings" ? renderEndingsTab(choices) : renderBringTab(bring)));
   }
   box.replaceChildren(...nodes);
 }
@@ -687,6 +778,29 @@ function fillSelect(id, options) {
   select.value = current;
 }
 
+// What a quest is searched on: its name, trader, map, objectives, status and the names in its choices.
+function searchText(task) {
+  let text = state.searchIndex.get(task.id);
+  if (text === undefined) {
+    text = [
+      task.name,
+      task.trader,
+      task.map || "",
+      task.status || "",
+      ...task.objectives.map((o) => o.description),
+      ...(task.endings ? task.endings.lines : []),
+    ]
+      .join(" \n ")
+      .toLowerCase();
+    state.searchIndex.set(task.id, text);
+  }
+  return text;
+}
+
+function searchTokens() {
+  return document.getElementById("filter-search").value.toLowerCase().split(/\s+/).filter(Boolean);
+}
+
 function renderTasks() {
   const storylineFilter = document.getElementById("filter-storyline").value;
   const traderFilter = document.getElementById("filter-trader").value;
@@ -694,19 +808,40 @@ function renderTasks() {
   const actionableOnly = document.getElementById("filter-actionable").checked;
   const hideCompleted = document.getElementById("filter-hide-completed").checked;
 
-  const filtered = state.tasks.filter((task) => {
+  const endingsOnly = document.getElementById("filter-endings").checked;
+  const tokens = searchTokens();
+
+  const matchesFilters = (task) => {
     if (storylineFilter && !task.storylineIds.includes(storylineFilter)) return false;
-    if (acceptedOnly() && task.status !== "accepted" && task.status !== "failed") return false;
     if (traderFilter && task.trader !== traderFilter) return false;
     if (mapFilter && task.map !== mapFilter) return false;
     if (actionableOnly && !(task.actionable && task.status !== "completed")) return false;
     if (hideCompleted && task.status === "completed") return false;
+    if (endingsOnly && !task.endings) return false;
+    if (tokens.length > 0) {
+      const text = searchText(task);
+      if (!tokens.every((token) => text.includes(token))) return false;
+    }
     return true;
-  });
+  };
+  const isAccepted = (task) => task.status === "accepted" || task.status === "failed";
+  const matching = state.tasks.filter(matchesFilters);
+  const filtered = acceptedOnly() ? matching.filter(isAccepted) : matching;
 
   const container = document.getElementById("tasks");
   container.innerHTML = "";
-  if (filtered.length === 0 && acceptedOnly()) {
+
+  if (tokens.length > 0) {
+    const hidden = matching.length - filtered.length;
+    const note = el("p", { className: "hint search-note" }, `${filtered.length} match${filtered.length === 1 ? "" : "es"}`);
+    if (hidden > 0) {
+      note.append(
+        ` — ${hidden} more among quests you haven't accepted. `,
+        el("button", { type: "button", className: "link-button", onclick: () => document.getElementById("filter-accepted").click() }, "Show them")
+      );
+    }
+    container.append(note);
+  } else if (filtered.length === 0 && acceptedOnly()) {
     container.append(
       el(
         "p",
@@ -730,6 +865,9 @@ function renderTasks() {
     if (task.blocked) {
       badges.push('<span class="badge failed" title="You failed a quest this one needs completed">Blocked</span>');
     }
+    if (task.endings) {
+      badges.push('<span class="badge warn" title="Finishing this quest can fail others, or it can be failed by them">⚠ Multiple endings</span>');
+    }
     const objectives = task.objectives
       .map((o) => `<li>${escapeHtml(o.description)}${o.optional ? " (optional)" : ""}</li>`)
       .join("");
@@ -748,13 +886,48 @@ function renderTasks() {
       card.append(" ");
     }
     card.append(pinButton(task));
+    if (task.endings) {
+      card.append(
+        el(
+          "details",
+          { className: "endings-note" },
+          el("summary", {}, "⚠ Choices — read before you complete it"),
+          ...task.endings.lines.map((line) => el("p", {}, line))
+        )
+      );
+    }
     addQuestGuide(card, task);
     container.appendChild(card);
   }
 }
 
-for (const id of ["filter-trader", "filter-map", "filter-actionable", "filter-hide-completed"]) {
+for (const id of ["filter-trader", "filter-map", "filter-actionable", "filter-hide-completed", "filter-endings"]) {
   document.getElementById(id).addEventListener("change", renderTasks);
+}
+
+// Search narrows the list as you type. "/" jumps to the box and Escape clears it.
+{
+  const search = document.getElementById("filter-search");
+  let timer = null;
+  search.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(renderTasks, 120);
+  });
+  search.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      search.value = "";
+      renderTasks();
+      search.blur();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName) || event.target.isContentEditable;
+    if (event.key === "/" && !typing && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      search.focus();
+      search.select();
+    }
+  });
 }
 
 // "Accepted only" is on by default and the player's choice is remembered in this browser.
